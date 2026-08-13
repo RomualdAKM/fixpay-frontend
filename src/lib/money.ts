@@ -1,12 +1,12 @@
 import type { Money } from "@/lib/api/types";
-import { formatFcfa } from "@/lib/format";
+import { formatFcfa, formatUsd } from "@/lib/format";
 
 /**
- * Bridge between the API's minor-unit `Money` and the FCFA formatters, which
- * take a major-unit integer. The backend only ever sends XOF (scale 0) to these
- * screens, so minor equals major; the scale division is applied defensively so
- * a future USD leg would still render correctly. Never produces a float for
- * XOF — scale 0 leaves the integer untouched.
+ * Bridge between the API's minor-unit `Money` and the display formatters. The
+ * wallet legs send XOF (scale 0), where minor equals major; the CARD legs send
+ * USD (scale 2, cents). The scale division renders a major-unit number for the
+ * rare consumer that needs one — but display always goes through `formatMoney`,
+ * which formats USD from the integer of cents directly, never from this float.
  */
 export function majorUnits(money: Money): number {
   return money.scale === 0
@@ -14,9 +14,26 @@ export function majorUnits(money: Money): number {
     : money.amount_minor / 10 ** money.scale;
 }
 
-/** Format a `Money` for display. XOF renders as "1 866 252 FCFA". */
+/**
+ * Format a `Money` for display, per currency: XOF renders as "1 866 252 FCFA"
+ * (no decimals, scale 0), USD as "59.99 USD" (two decimals from the cents
+ * integer). The currency drives the decimals — never hard-coded, never a wrong
+ * ×100.
+ */
 export function formatMoney(money: Money): string {
-  return formatFcfa(majorUnits(money));
+  return money.currency === "USD"
+    ? formatUsd(money.amount_minor)
+    : formatFcfa(majorUnits(money));
+}
+
+/**
+ * Convert a user-entered whole-dollar amount to the minor unit (cents) the card
+ * API expects. The numeric input carries no subdivision, so a dollar becomes
+ * exactly 100 cents; `Math.round` keeps the result an integer with no float
+ * drift.
+ */
+export function usdMinor(majorDollars: number): number {
+  return Math.round(majorDollars * 100);
 }
 
 /**

@@ -1,198 +1,274 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { ChevronLeft } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
+import { PinPromptDialog } from "@/components/auth/PinPromptDialog";
 import { BottomNav } from "@/components/layout/BottomNav";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { InlineError } from "@/components/feedback/InlineError";
 import { AmountInput } from "@/components/ui/AmountInput";
 import { BalanceCard } from "@/components/ui/BalanceCard";
-import { IconButton } from "@/components/ui/IconButton";
+import { Button } from "@/components/ui/Button";
 import { InfoBanner } from "@/components/ui/InfoBanner";
 import { QuickAmountChips } from "@/components/ui/QuickAmountChips";
 import { SectionLabel } from "@/components/ui/SectionLabel";
 import { SelectableRow } from "@/components/ui/SelectableRow";
 import { StickyActionBar } from "@/components/ui/StickyActionBar";
 import { TransactionFacts } from "@/components/ui/TransactionFacts";
-import { formatAmount, formatFcfa } from "@/lib/format";
 import {
-  cardTopUpFacts,
-  cards,
-  primaryCard,
-  quickAmounts,
-  wallet,
-  type CardId,
-} from "@/lib/mock-data";
+  useCardRechargeQuote,
+  useCards,
+  useRechargeCard,
+} from "@/lib/api/cardHooks";
+import { useWallet } from "@/lib/api/moneyHooks";
+import { PinTicketAction } from "@/lib/api/types";
+import { formatFcfa } from "@/lib/format";
+import { formatMoney, majorUnits, usdMinor } from "@/lib/money";
+import { cardExpiry, maskedPan } from "@/lib/cards";
 
-/* Même squelette et même échelle d'espacement que les écrans 04/05/07/08 —
-   voir le commentaire de rythme de wallet/deposit/page.tsx. */
 const FLOW_MAIN =
   "px-5 pt-[54px] pb-24 lg:mx-auto lg:w-full lg:max-w-[840px] lg:px-10 lg:pt-9 lg:pb-12";
 const FLOW_GRID = "mt-8 lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-10";
 const FLOW_ASIDE = "mt-8 lg:mt-0";
 
-/** Montant saisi au clavier natif → entier de francs (« 50 000 » → 50000). */
-function parseAmount(raw: string): number {
-  return Number(raw.replace(/\D/g, "")) || 0;
+/** Ne garde que les chiffres : le dollar-carte est saisi en unités entières,
+ *  et le champ doit refléter exactement le montant qui sert au devis et à
+ *  l'exécution (un « . » parasite ne doit pas multiplier la somme par 10). */
+function sanitizeDollars(raw: string): string {
+  return raw.replace(/\D/g, "");
 }
 
-/**
- * Écran 06 · Alimenter ma carte.
- *
- * ÉTAPE 11 (composition) : l'écran gardait la bonne SÉQUENCE mais avait six
- * marges différentes pour cinq blocs (16 / 16 / 20 / 10 / 12 / 24), ce qui
- * l'aplatissait en liste d'éléments équidistants. Il se lit désormais en deux
- * groupes — ce que je dépense (contexte, ressource, montant) et où cela va
- * (destination, faits, action) —, séparés par 32px en mobile et par une
- * colonne en desktop, où la page n'a plus une moitié vide sous une colonne de
- * 560px.
- *
- * Conservé de la passe précédente : le CTA épinglé, le bandeau neutre, et
- * l'absence de tuile `CreditCard` générique sur les deux réseaux.
- */
+/** Montant en dollars entiers saisi au clavier natif (« 50 » → 50). */
+function parseDollars(raw: string): number {
+  return Number(sanitizeDollars(raw)) || 0;
+}
+
+const QUICK_USD = [10, 25, 50, 100];
+const MIN_USD = 1;
+
 export default function CardTopUpPage() {
   const router = useRouter();
-  const [amount, setAmount] = useState("");
-  const [selectedCard, setSelectedCard] = useState<CardId>("visa-4291");
+  const queryCard = useSearchParams().get("card");
 
-  const transferred = parseAmount(amount);
-  const destination = cards.find((c) => c.id === selectedCard) ?? primaryCard;
-  /*
-   * Le plafond pertinent d'une alimentation n'est pas celui du portefeuille
-   * mais celui de la carte DESTINATAIRE (cf. `cardTopUpFacts` dans mock-data).
-   */
-  const cardRemaining = destination.monthlyLimit - destination.monthlyUsed;
-  /*
-   * Le « solde après » n'apparaît qu'une fois un montant saisi, et jamais
-   * au-delà du solde : `formatFcfa` rend une valeur absolue, un reste négatif
-   * s'y afficherait en positif.
-   */
-  const enough = transferred > 0 && transferred <= wallet.balance;
-  const balanceAfter = enough
-    ? formatFcfa(wallet.balance - transferred)
-    : undefined;
+  const cardsQuery = useCards();
+  const walletQuery = useWallet();
+  const recharge = useRechargeCard();
+
+  const [selectedCard, setSelectedCard] = useState<string | null>(queryCard);
+  const [amount, setAmount] = useState("");
+  const [pinOpen, setPinOpen] = useState(false);
+
+  const activeCards = useMemo(
+    () => (cardsQuery.data ?? []).filter((c) => c.status === "active"),
+    [cardsQuery.data],
+  );
+
+  // Sélection par défaut : la carte de l'URL, sinon l'unique carte active.
+  useEffect(() => {
+    if (selectedCard !== null) return;
+    if (queryCard && activeCards.some((c) => c.uuid === queryCard)) {
+      setSelectedCard(queryCard);
+    } else if (activeCards.length === 1) {
+      setSelectedCard(activeCards[0]!.uuid);
+    }
+  }, [queryCard, activeCards, selectedCard]);
+
+  const dollars = parseDollars(amount);
+  const amountUsdMinor = usdMinor(dollars);
+
+  const quoteQuery = useCardRechargeQuote(
+    selectedCard,
+    dollars >= MIN_USD ? amountUsdMinor : 0,
+  );
+  const quote = quoteQuery.data;
+
+  const clientPriceMinor = quote?.client_price.amount_minor ?? 0;
+  const balanceMinor = walletQuery.data?.balance.amount_minor ?? 0;
+  const withinBalance = quote ? clientPriceMinor <= balanceMinor : true;
+
+  const canConfirm =
+    selectedCard !== null &&
+    dollars >= MIN_USD &&
+    quote !== undefined &&
+    withinBalance &&
+    !recharge.isPending;
+
+  const balanceAfter =
+    quote && walletQuery.data
+      ? formatFcfa(majorUnits(walletQuery.data.balance) - clientPriceMinor)
+      : undefined;
+
+  const onTicket = (pinTicket: string) => {
+    setPinOpen(false);
+    if (!selectedCard) return;
+    recharge.mutate(
+      {
+        uuid: selectedCard,
+        input: { amount_minor: amountUsdMinor, currency: "USD" },
+        pinTicket,
+      },
+      {
+        onSuccess: (result) =>
+          router.push(`/cards/top-up/success?uuid=${result.uuid}`),
+      },
+    );
+  };
 
   return (
     <>
       <main className={FLOW_MAIN}>
-        <header className="flex items-center gap-3.5">
-          <IconButton
-            icon={ChevronLeft}
-            size={38}
-            iconClass="text-text"
-            ariaLabel="Retour"
-            onClick={() => router.back()}
-          />
-          <h1 className="text-text min-w-0 truncate text-[19px] leading-tight font-bold lg:text-[22px]">
-            Alimenter ma carte
-          </h1>
-        </header>
+        <PageHeader title="Alimenter ma carte" backHref="/cards" />
 
         <div className={FLOW_GRID}>
-          {/* ---- Colonne de saisie : contexte, ressource, montant ---- */}
+          {/* ---- Colonne de saisie ---- */}
           <div>
             <InfoBanner>
-              Le montant est débité de votre portefeuille FixPay et crédité
-              instantanément sur la carte sélectionnée.
+              Le montant en dollars est crédité sur la carte ; son coût est
+              débité de votre portefeuille FixPay au taux appliqué.
             </InfoBanner>
 
-            {/* 16px : le bandeau et la ressource sont le MÊME groupe (« d'où
-                vient l'argent »), ils restent serrés. */}
             <div className="mt-4">
               <BalanceCard
                 label="Portefeuille disponible"
-                amount={formatFcfa(wallet.balance)}
+                amount={
+                  walletQuery.data
+                    ? formatMoney(walletQuery.data.balance)
+                    : "…"
+                }
               />
             </div>
 
-            {/* 32px : nouveau groupe — la saisie. */}
-            <section className="mt-8">
-              <div className="flex items-baseline justify-between gap-3">
-                <SectionLabel>Montant à transférer (FCFA)</SectionLabel>
-                <button
-                  type="button"
-                  onClick={() => setAmount(formatAmount(wallet.balance))}
-                  className="text-primary focus-visible:ring-primary/60 rounded-xs text-[12.5px] leading-[18px] font-medium transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:outline-none"
-                >
-                  Tout transférer
-                </button>
-              </div>
+            <section className="mt-8 lg:max-w-[420px]">
+              <SectionLabel>Montant à charger (USD)</SectionLabel>
               <div className="mt-3">
                 <AmountInput
                   value={amount}
-                  onChange={setAmount}
+                  onChange={(v) => setAmount(sanitizeDollars(v))}
                   placeholder="0"
-                  ariaLabel="Montant à transférer en francs CFA"
+                  ariaLabel="Montant à charger en dollars"
                 />
               </div>
               <div className="mt-3">
                 <QuickAmountChips
-                  amounts={quickAmounts.topUp}
-                  onSelect={(n) => setAmount(formatAmount(n))}
+                  amounts={QUICK_USD}
+                  onSelect={(n) => setAmount(String(n))}
                 />
               </div>
-              {/* `text-secondary` et non `muted` : la contrainte d'un champ se
-                  lit, elle ne se devine pas (le muted mesurait 4,4:1). */}
               <p className="text-text-secondary mt-2 text-[11.5px] leading-[16px]">
-                Minimum {formatFcfa(cardTopUpFacts.min)}
+                Minimum {MIN_USD} USD
               </p>
+              {quote && !withinBalance && (
+                <p className="text-danger mt-2 text-[11.5px] leading-[16px]">
+                  Solde du portefeuille insuffisant pour ce montant.
+                </p>
+              )}
+              {recharge.isError && (
+                <InlineError error={recharge.error} className="mt-3" />
+              )}
             </section>
           </div>
 
-          {/* ---- Colonne de vérité : destination, puis ce que ça produit ---- */}
+          {/* ---- Colonne de vérité ---- */}
           <aside className={FLOW_ASIDE}>
             <section>
-              <SectionLabel>Carte de destination</SectionLabel>
-              <div className="mt-3 space-y-2">
-                {cards.map((card) => (
-                  <SelectableRow
-                    key={card.id}
-                    title={card.label}
-                    subtitle={`Solde actuel : ${formatFcfa(card.balance)}`}
-                    height={64}
-                    selected={selectedCard === card.id}
-                    onSelect={() => setSelectedCard(card.id)}
-                  />
-                ))}
-              </div>
+              <SectionLabel>Carte à alimenter</SectionLabel>
+              {cardsQuery.isPending ? (
+                <div className="bg-surface-2 mt-3 h-[64px] animate-pulse rounded-md" />
+              ) : activeCards.length === 0 ? (
+                <p className="text-text-muted mt-3 text-[12.5px] leading-[18px]">
+                  Aucune carte active à alimenter.
+                </p>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  {activeCards.map((card) => (
+                    <SelectableRow
+                      key={card.uuid}
+                      title={maskedPan(card.pan_last4)}
+                      subtitle={`Carte ${card.currency} · Exp ${cardExpiry(card)}`}
+                      height={64}
+                      selected={selectedCard === card.uuid}
+                      onSelect={() => setSelectedCard(card.uuid)}
+                    />
+                  ))}
+                </div>
+              )}
             </section>
 
             <section className="mt-8">
-              <SectionLabel>Frais et délai</SectionLabel>
-              <div className="mt-3">
-                <TransactionFacts
-                  fee={cardTopUpFacts.feeLabel}
-                  delay={cardTopUpFacts.delay}
-                  limit={formatFcfa(cardRemaining)}
-                  balanceAfter={balanceAfter}
+              <SectionLabel>Coût et crédit</SectionLabel>
+              {quoteQuery.isFetching && !quote ? (
+                <div
+                  className="bg-surface-2 mt-3 h-[52px] animate-pulse rounded-md"
+                  aria-hidden="true"
                 />
-              </div>
+              ) : quoteQuery.isError ? (
+                <InlineError error={quoteQuery.error} className="mt-3" />
+              ) : quote ? (
+                <div className="mt-3">
+                  <TransactionFacts
+                    feeLabel="Crédité sur la carte"
+                    fee={formatMoney(quote.credit_usd)}
+                    delay="Instantané"
+                    balanceAfter={balanceAfter}
+                  />
+                  <div className="border-border mt-3.5 flex items-baseline justify-between border-t pt-3.5">
+                    <span className="text-text-secondary text-[12.5px] leading-[16px]">
+                      Débité du portefeuille
+                    </span>
+                    <span className="text-text text-[13.5px] leading-[18px] font-semibold">
+                      {formatMoney(quote.client_price)}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-text-muted mt-3 text-[12px] leading-[17px]">
+                  Saisissez un montant pour afficher le coût réel.
+                </p>
+              )}
             </section>
           </aside>
         </div>
 
-        {/* L'action, épinglée : elle ne peut plus être masquée, et son état
-            inactif est le même objet que sur 04, 05 et 13. Le rythme de tête
-            (marge, filet, padding) appartient à la barre — voir
-            `StickyActionBar`. */}
         <StickyActionBar>
           <div>
-            {/* L'alimentation de carte n'est pas encore raccordée à l'API
-                (POST /api/cards/{uuid}/recharge, PIN card_recharge, conversion
-                FX) : le CTA reste inactif plutôt que de simuler un succès. */}
-            <p className="text-text-muted mb-3 text-[11.5px] leading-[16px] lg:max-w-[320px]">
-              L&apos;alimentation de carte sera bientôt disponible.
-            </p>
-            <button
-              type="button"
-              disabled
-              className="border-border bg-surface-2 text-text-muted inline-flex h-[50px] w-full cursor-not-allowed items-center justify-center rounded-md border text-[15px] font-semibold lg:max-w-[320px]"
-            >
-              Alimenter la carte
-            </button>
+            {canConfirm ? (
+              <Button
+                onClick={() => setPinOpen(true)}
+                className="lg:max-w-[320px]"
+              >
+                {recharge.isPending ? "Envoi…" : "Alimenter la carte"}
+              </Button>
+            ) : (
+              <button
+                type="button"
+                disabled
+                className="border-border bg-surface-2 text-text-muted inline-flex h-[50px] w-full cursor-not-allowed items-center justify-center rounded-md border text-[15px] font-semibold lg:max-w-[320px]"
+              >
+                Alimenter la carte
+              </button>
+            )}
           </div>
         </StickyActionBar>
       </main>
+
+      {/* Ticket : action card_recharge, ressource card liée à l'uuid, SANS
+          montant (la garde consomme le ticket avec amount=null). */}
+      <PinPromptDialog
+        open={pinOpen}
+        action={PinTicketAction.CardRecharge}
+        resourceType="card"
+        resourceUuid={selectedCard ?? undefined}
+        description={
+          quote
+            ? `Alimentation de ${formatMoney(quote.credit_usd)} · ${formatMoney(
+                quote.client_price,
+              )} débités du portefeuille.`
+            : undefined
+        }
+        onTicket={onTicket}
+        onCancel={() => setPinOpen(false)}
+      />
 
       <BottomNav />
     </>

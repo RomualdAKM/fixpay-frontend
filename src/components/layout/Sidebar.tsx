@@ -32,7 +32,7 @@ const PRIMARY: NavEntry[] = [
   { label: "Accueil", href: "/", icon: House, match: ["/"] },
   {
     label: "Cartes",
-    href: "/cards/visa-4291",
+    href: "/cards",
     icon: CreditCard,
     match: ["/cards", "/payment"],
   },

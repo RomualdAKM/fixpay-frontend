@@ -159,10 +159,21 @@ export interface LinkMobileMoneyAccountInput {
   is_primary?: boolean;
 }
 
-/** App\Http\Resources\CardResource. */
+/** App\Domain\Card\CardStatus. */
+export type CardStatus = "pending" | "active" | "frozen" | "cancelled";
+
+/**
+ * App\Http\Resources\CardResource.
+ *
+ * BACKEND REALITY: the resource exposes NO balance and NO network brand (Visa /
+ * Mastercard). The card balance lives only in the ledger and is never sent to
+ * the client; the network is not part of the payload either. Screens therefore
+ * never render a fabricated USD balance, and the card face falls back to a
+ * neutral visual — the data does not lie.
+ */
 export interface Card {
   uuid: string;
-  status: string;
+  status: CardStatus;
   channel: string;
   pan_last4: string;
   expiry_month: number;
@@ -172,7 +183,11 @@ export interface Card {
   created_at: string | null;
 }
 
-/** App\Http\Resources\CardTransactionResource. */
+/**
+ * App\Http\Resources\CardTransactionResource. Amounts are in the card currency
+ * (USD, scale 2). GET /api/cards/{uuid}/transactions returns a FLAT array
+ * (CardController::transactions), not a paginated envelope.
+ */
 export interface CardTransaction {
   uuid: string;
   type: string;
@@ -189,6 +204,93 @@ export interface CardReveal {
   cvv: string;
   expiry: string;
   cardholder_name: string;
+}
+
+/**
+ * Terminal-or-pending state shared by the async card orders
+ * (App\Domain\Card\Card{Issuance,Recharge,Cashout}State).
+ */
+export type CardOrderState = "pending" | "success" | "failed";
+
+/**
+ * An issuable BIN (App\Http\Resources\CardOfferResource), GET /api/card-offers.
+ * `client_price` is the one-off issuance price debited from the XOF wallet.
+ */
+export interface CardOffer {
+  bin_uuid: string;
+  brand: string;
+  currency: CurrencyCode;
+  client_price: Money;
+}
+
+/**
+ * POST /api/cards result (CardIssuanceOrderResource). The order is asynchronous:
+ * `state` starts `pending` and the `card_uuid` is filled once the card is
+ * opened. There is no GET endpoint for the order — the front observes the new
+ * card via GET /api/cards instead.
+ */
+export interface CardIssuanceOrder {
+  uuid: string;
+  state: CardOrderState;
+  client_price: Money;
+  card_uuid: string | null;
+  failure_reason: string | null;
+  created_at: string | null;
+}
+
+/** POST /api/cards/{uuid}/recharge result (CardRechargeResource). */
+export interface CardRecharge {
+  uuid: string;
+  state: CardOrderState;
+  card_uuid: string | null;
+  credit_usd: Money;
+  client_price: Money;
+  failure_reason: string | null;
+  created_at: string | null;
+}
+
+/** POST /api/cards/{uuid}/cashout result (CardCashoutResource). */
+export interface CardCashout {
+  uuid: string;
+  state: CardOrderState;
+  card_uuid: string | null;
+  amount_usd: Money;
+  credited_xof: Money;
+  failure_reason: string | null;
+  created_at: string | null;
+}
+
+/** GET /api/cards/{uuid}/recharge/quote (CardRechargeQuoteResource). */
+export interface CardRechargeQuote {
+  credit_usd: Money;
+  client_price: Money;
+  rate_applied: string | number | null;
+  indicative: boolean;
+}
+
+/** GET /api/cards/{uuid}/cashout/quote (CardCashoutQuoteResource). */
+export interface CardCashoutQuote {
+  amount_usd: Money;
+  credited_xof: Money;
+  rate_applied: string | number | null;
+  indicative: boolean;
+}
+
+/** POST /api/cards body (IssueCardRequest). Only the BIN is accepted. */
+export interface IssueCardInput {
+  bin_uuid: string;
+}
+
+/** POST /api/cards/{uuid}/recharge body (RechargeCardRequest). USD cents. */
+export interface RechargeCardInput {
+  amount_minor: number;
+  currency: CurrencyCode;
+}
+
+/** POST /api/cards/{uuid}/cashout body (CashoutCardRequest). USD cents. */
+export interface CashoutCardInput {
+  amount_minor: number;
+  currency: CurrencyCode;
 }
 
 /** App\Http\Resources\DepositResource. */

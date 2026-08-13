@@ -32,3 +32,14 @@ export function isWithdrawalFinal(status: string): boolean {
 export function isWithdrawalPendingApproval(status: string): boolean {
   return status === "pending_approval";
 }
+
+/**
+ * Terminal states of an async card order (issuance, recharge, cashout),
+ * mirroring App\Domain\Card\Card*State::isFinal(). `pending` is the only
+ * non-final state.
+ */
+export const CARD_ORDER_FINAL_STATES = ["success", "failed"] as const;
+
+export function isCardOrderFinal(state: string): boolean {
+  return (CARD_ORDER_FINAL_STATES as readonly string[]).includes(state);
+}

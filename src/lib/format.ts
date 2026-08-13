@@ -71,6 +71,33 @@ export function formatFee(fee: number): string {
   return fee === 0 ? "Gratuit" : formatFcfa(fee);
 }
 
+/*
+ * USD — les cartes FixPay sont libellées en dollars (scale 2, cents). Le dollar
+ * a une subdivision, donc DEUX décimales, toujours : elles ne sont ni codées en
+ * dur ailleurs ni dérivées d'un float, mais reconstruites depuis l'entier de
+ * cents (jamais `cents / 100` en virgule flottante, qui donnerait 0.1 + 0.2 ≠
+ * 0.3). Le séparateur de milliers est la même espace insécable que le franc, et
+ * l'unité « USD » colle au nombre par cette même espace pour ne pas s'orpheliner.
+ */
+
+/** Bare USD figure from an integer of cents: 123456 -> "1 234.56". */
+export function formatUsdFigure(cents: number): string {
+  const rounded = Math.round(cents);
+  const negative = rounded < 0;
+  const abs = Math.abs(rounded);
+  const whole = groupThousands(String(Math.trunc(abs / 100)));
+  const fraction = String(abs % 100).padStart(2, "0");
+  return `${negative ? "-" : ""}${whole}.${fraction}`;
+}
+
+/** USD unit for the display currency of a card. */
+export const USD_CURRENCY = "USD";
+
+/** USD amount with its currency suffix: 123456 (cents) -> "1 234.56 USD". */
+export function formatUsd(cents: number): string {
+  return `${formatUsdFigure(cents)}${NBSP}${USD_CURRENCY}`;
+}
+
 /**
  * Signed transaction amount, sign followed by a space:
  * "- 39 341 FCFA" / "+ 131 192 FCFA" / "- €59.99".

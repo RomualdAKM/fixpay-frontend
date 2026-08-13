@@ -1,184 +1,242 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { ChevronLeft } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
+import { PinPromptDialog } from "@/components/auth/PinPromptDialog";
 import { BottomNav } from "@/components/layout/BottomNav";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { InlineError } from "@/components/feedback/InlineError";
 import { AmountInput } from "@/components/ui/AmountInput";
-import { BalanceCard } from "@/components/ui/BalanceCard";
-import { IconButton } from "@/components/ui/IconButton";
+import { Button } from "@/components/ui/Button";
 import { InfoBanner } from "@/components/ui/InfoBanner";
 import { QuickAmountChips } from "@/components/ui/QuickAmountChips";
 import { SectionLabel } from "@/components/ui/SectionLabel";
+import { SelectableRow } from "@/components/ui/SelectableRow";
 import { StickyActionBar } from "@/components/ui/StickyActionBar";
 import { TransactionFacts } from "@/components/ui/TransactionFacts";
-import { formatAmount, formatFcfa } from "@/lib/format";
-import { cardWithdrawFacts, primaryCard, quickAmounts } from "@/lib/mock-data";
+import {
+  useCardCashoutQuote,
+  useCards,
+  useCashoutCard,
+} from "@/lib/api/cardHooks";
+import { PinTicketAction } from "@/lib/api/types";
+import { formatMoney, usdMinor } from "@/lib/money";
+import { cardExpiry, maskedPan } from "@/lib/cards";
 
-/* Même squelette et même échelle d'espacement que les écrans 04/05/06/08 —
-   voir le commentaire de rythme de wallet/deposit/page.tsx. */
 const FLOW_MAIN =
   "px-5 pt-[54px] pb-24 lg:mx-auto lg:w-full lg:max-w-[840px] lg:px-10 lg:pt-9 lg:pb-12";
 const FLOW_GRID = "mt-8 lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-10";
 const FLOW_ASIDE = "mt-8 lg:mt-0";
 
-/** Carte source du retrait (Visa •••• 4291, seule carte du flux). */
-const sourceCard = primaryCard;
-
-/** Montant saisi au clavier natif → entier de francs (« 50 000 » → 50000). */
-function parseAmount(raw: string): number {
-  return Number(raw.replace(/\D/g, "")) || 0;
+/** Ne garde que les chiffres : le dollar-carte est saisi en unités entières,
+ *  et le champ doit refléter exactement le montant qui sert au devis et à
+ *  l'exécution (un « . » parasite ne doit pas multiplier la somme par 10). */
+function sanitizeDollars(raw: string): string {
+  return raw.replace(/\D/g, "");
 }
 
-/**
- * Écran 07 · Retirer de la carte.
- *
- * ÉTAPE 11 (composition) : la séquence de l'écran (contexte → ressource →
- * montant → source → action) est celle que l'audit tient pour le bon patron du
- * lot ; elle est conservée, mais ses six marges hétérogènes sont ramenées à
- * l'échelle du lot, et la source rejoint la colonne de vérité où elle fait
- * exactement le même office que « Carte de destination » sur l'écran 06. Les
- * deux écrans jumeaux ont enfin la même carcasse.
- *
- * Conservé : une seule écriture du solde, la ligne « Depuis » à plat (pas de
- * faux sélecteur radio à une option), le CTA épinglé.
- */
+/** Montant en dollars entiers saisi au clavier natif (« 50 » → 50). */
+function parseDollars(raw: string): number {
+  return Number(sanitizeDollars(raw)) || 0;
+}
+
+const QUICK_USD = [10, 25, 50, 100];
+const MIN_USD = 1;
+
 export default function CardWithdrawPage() {
   const router = useRouter();
-  const [amount, setAmount] = useState("");
+  const queryCard = useSearchParams().get("card");
 
-  const withdrawn = parseAmount(amount);
-  /*
-   * Le « solde après » n'apparaît qu'une fois un montant saisi, et jamais
-   * au-delà du solde : `formatFcfa` rend une valeur absolue, un reste négatif
-   * s'y afficherait en positif.
-   */
-  const enough = withdrawn > 0 && withdrawn <= sourceCard.balance;
-  const balanceAfter = enough
-    ? formatFcfa(sourceCard.balance - withdrawn)
-    : undefined;
+  const cardsQuery = useCards();
+  const cashout = useCashoutCard();
+
+  const [selectedCard, setSelectedCard] = useState<string | null>(queryCard);
+  const [amount, setAmount] = useState("");
+  const [pinOpen, setPinOpen] = useState(false);
+
+  const activeCards = useMemo(
+    () => (cardsQuery.data ?? []).filter((c) => c.status === "active"),
+    [cardsQuery.data],
+  );
+
+  useEffect(() => {
+    if (selectedCard !== null) return;
+    if (queryCard && activeCards.some((c) => c.uuid === queryCard)) {
+      setSelectedCard(queryCard);
+    } else if (activeCards.length === 1) {
+      setSelectedCard(activeCards[0]!.uuid);
+    }
+  }, [queryCard, activeCards, selectedCard]);
+
+  const dollars = parseDollars(amount);
+  const amountUsdMinor = usdMinor(dollars);
+
+  const quoteQuery = useCardCashoutQuote(
+    selectedCard,
+    dollars >= MIN_USD ? amountUsdMinor : 0,
+  );
+  const quote = quoteQuery.data;
+
+  const canConfirm =
+    selectedCard !== null &&
+    dollars >= MIN_USD &&
+    quote !== undefined &&
+    !cashout.isPending;
+
+  const onTicket = (pinTicket: string) => {
+    setPinOpen(false);
+    if (!selectedCard) return;
+    cashout.mutate(
+      {
+        uuid: selectedCard,
+        input: { amount_minor: amountUsdMinor, currency: "USD" },
+        pinTicket,
+      },
+      {
+        onSuccess: (result) =>
+          router.push(`/cards/withdraw/success?uuid=${result.uuid}`),
+      },
+    );
+  };
 
   return (
     <>
       <main className={FLOW_MAIN}>
-        <header className="flex items-center gap-3.5">
-          <IconButton
-            icon={ChevronLeft}
-            size={38}
-            iconClass="text-text"
-            ariaLabel="Retour"
-            onClick={() => router.back()}
-          />
-          <h1 className="text-text min-w-0 truncate text-[19px] leading-tight font-bold lg:text-[22px]">
-            Retirer de la carte
-          </h1>
-        </header>
+        <PageHeader title="Retirer de la carte" backHref="/cards" />
 
         <div className={FLOW_GRID}>
-          {/* ---- Colonne de saisie : contexte, ressource, montant ---- */}
+          {/* ---- Colonne de saisie ---- */}
           <div>
             <InfoBanner>
-              Le montant est retiré de votre carte bancaire virtuelle et
-              recrédité sur votre portefeuille FixPay.
+              Le montant en dollars est retiré de la carte et recrédité en
+              francs sur votre portefeuille FixPay, au taux appliqué.
             </InfoBanner>
 
-            <div className="mt-4">
-              <BalanceCard
-                label="Solde disponible sur la carte"
-                amount={formatFcfa(sourceCard.balance)}
-              />
-            </div>
-
-            <section className="mt-8">
-              <div className="flex items-baseline justify-between gap-3">
-                <SectionLabel>Montant à retirer (FCFA)</SectionLabel>
-                <button
-                  type="button"
-                  onClick={() => setAmount(formatAmount(sourceCard.balance))}
-                  className="text-primary focus-visible:ring-primary/60 rounded-xs text-[12.5px] leading-[18px] font-medium transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:outline-none"
-                >
-                  Tout retirer
-                </button>
-              </div>
+            <section className="mt-8 lg:max-w-[420px]">
+              <SectionLabel>Montant à retirer (USD)</SectionLabel>
               <div className="mt-3">
                 <AmountInput
                   value={amount}
-                  onChange={setAmount}
+                  onChange={(v) => setAmount(sanitizeDollars(v))}
                   placeholder="0"
-                  ariaLabel="Montant à retirer en francs CFA"
+                  ariaLabel="Montant à retirer en dollars"
                 />
               </div>
               <div className="mt-3">
                 <QuickAmountChips
-                  amounts={quickAmounts.cardWithdraw}
-                  onSelect={(n) => setAmount(formatAmount(n))}
+                  amounts={QUICK_USD}
+                  onSelect={(n) => setAmount(String(n))}
                 />
               </div>
               <p className="text-text-secondary mt-2 text-[11.5px] leading-[16px]">
-                Minimum {formatFcfa(cardWithdrawFacts.min)}
+                Minimum {MIN_USD} USD
               </p>
+              {cashout.isError && (
+                <InlineError error={cashout.error} className="mt-3" />
+              )}
             </section>
           </div>
 
-          {/* ---- Colonne de vérité : source, puis ce que ça produit ---- */}
+          {/* ---- Colonne de vérité ---- */}
           <aside className={FLOW_ASIDE}>
             <section>
-              <SectionLabel>Carte débitée</SectionLabel>
-              <div className="mt-3 flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-text truncate text-[13.5px] leading-[18px] font-medium">
-                    {sourceCard.label}
-                  </p>
-                  <p className="text-text-muted mt-[3px] text-[12px] leading-[16px]">
-                    {sourceCard.type} · Expire {sourceCard.expiry}
-                  </p>
+              <SectionLabel>Carte à débiter</SectionLabel>
+              {cardsQuery.isPending ? (
+                <div className="bg-surface-2 mt-3 h-[64px] animate-pulse rounded-md" />
+              ) : activeCards.length === 0 ? (
+                <p className="text-text-muted mt-3 text-[12.5px] leading-[18px]">
+                  Aucune carte active à débiter.
+                </p>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  {activeCards.map((card) => (
+                    <SelectableRow
+                      key={card.uuid}
+                      title={maskedPan(card.pan_last4)}
+                      subtitle={`Carte ${card.currency} · Exp ${cardExpiry(card)}`}
+                      height={64}
+                      selected={selectedCard === card.uuid}
+                      onSelect={() => setSelectedCard(card.uuid)}
+                    />
+                  ))}
                 </div>
-                <Link
-                  href={`/cards/${sourceCard.id}`}
-                  className="text-primary focus-visible:ring-primary/60 shrink-0 rounded-xs text-[12.5px] leading-[18px] font-medium transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:outline-none"
-                >
-                  Changer
-                </Link>
-              </div>
+              )}
             </section>
 
             <section className="mt-8">
-              <SectionLabel>Frais et délai</SectionLabel>
-              <div className="mt-3">
-                {/* Aucun plafond ici : un retrait vers le portefeuille ne
-                    consomme pas le plafond de dépense de la carte. */}
-                <TransactionFacts
-                  fee={cardWithdrawFacts.feeLabel}
-                  delay={cardWithdrawFacts.delay}
-                  balanceAfter={balanceAfter}
+              <SectionLabel>Ce que vous recevez</SectionLabel>
+              {quoteQuery.isFetching && !quote ? (
+                <div
+                  className="bg-surface-2 mt-3 h-[52px] animate-pulse rounded-md"
+                  aria-hidden="true"
                 />
-              </div>
+              ) : quoteQuery.isError ? (
+                <InlineError error={quoteQuery.error} className="mt-3" />
+              ) : quote ? (
+                <div className="mt-3">
+                  <TransactionFacts
+                    feeLabel="Retiré de la carte"
+                    fee={formatMoney(quote.amount_usd)}
+                    delay="Instantané"
+                  />
+                  <div className="border-border mt-3.5 flex items-baseline justify-between border-t pt-3.5">
+                    <span className="text-text-secondary text-[12.5px] leading-[16px]">
+                      Crédité au portefeuille
+                    </span>
+                    <span className="text-text text-[13.5px] leading-[18px] font-semibold">
+                      {formatMoney(quote.credited_xof)}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-text-muted mt-3 text-[12px] leading-[17px]">
+                  Saisissez un montant pour afficher le crédit réel.
+                </p>
+              )}
             </section>
           </aside>
         </div>
 
         <StickyActionBar>
-          {/* Le rythme de tête (marge, filet, padding) appartient désormais à
-              la barre elle-même — voir `StickyActionBar`. */}
           <div>
-            {/* Le retrait de carte n'est pas encore raccordé à l'API
-                (POST /api/cards/{uuid}/cashout, PIN card_cashout, conversion
-                FX) : le CTA reste inactif plutôt que de simuler un succès. */}
-            <p className="text-text-muted mb-3 text-[11.5px] leading-[16px] lg:max-w-[320px]">
-              Le retrait de carte sera bientôt disponible.
-            </p>
-            <button
-              type="button"
-              disabled
-              className="border-border bg-surface-2 text-text-muted inline-flex h-[50px] w-full cursor-not-allowed items-center justify-center rounded-md border text-[15px] font-semibold lg:max-w-[320px]"
-            >
-              Confirmer le retrait
-            </button>
+            {canConfirm ? (
+              <Button
+                onClick={() => setPinOpen(true)}
+                className="lg:max-w-[320px]"
+              >
+                {cashout.isPending ? "Envoi…" : "Confirmer le retrait"}
+              </Button>
+            ) : (
+              <button
+                type="button"
+                disabled
+                className="border-border bg-surface-2 text-text-muted inline-flex h-[50px] w-full cursor-not-allowed items-center justify-center rounded-md border text-[15px] font-semibold lg:max-w-[320px]"
+              >
+                Confirmer le retrait
+              </button>
+            )}
           </div>
         </StickyActionBar>
       </main>
+
+      {/* Ticket : action card_cashout, ressource card liée à l'uuid, SANS
+          montant (la garde consomme le ticket avec amount=null). */}
+      <PinPromptDialog
+        open={pinOpen}
+        action={PinTicketAction.CardCashout}
+        resourceType="card"
+        resourceUuid={selectedCard ?? undefined}
+        description={
+          quote
+            ? `Retrait de ${formatMoney(quote.amount_usd)} · ${formatMoney(
+                quote.credited_xof,
+              )} crédités au portefeuille.`
+            : undefined
+        }
+        onTicket={onTicket}
+        onCancel={() => setPinOpen(false)}
+      />
 
       <BottomNav />
     </>

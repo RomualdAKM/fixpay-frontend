@@ -1,8 +1,18 @@
 import { apiFetch } from "./client";
 import type {
   Card,
+  CardCashout,
+  CardCashoutQuote,
+  CardIssuanceOrder,
+  CardOffer,
+  CardRecharge,
+  CardRechargeQuote,
+  CardReveal,
   CardTransaction,
+  CashoutCardInput,
   CreateDepositInput,
+  IssueCardInput,
+  RechargeCardInput,
   CreateWithdrawalInput,
   Deposit,
   LinkMobileMoneyAccountInput,
@@ -172,12 +182,129 @@ export function fetchWithdrawal(uuid: string): Promise<Withdrawal> {
   return apiFetch<Withdrawal>(`/withdrawals/${uuid}`);
 }
 
+// ---- Cards -------------------------------------------------------------
+
+/** GET /api/cards — the user's cards (newest first). */
 export function fetchCards(): Promise<Card[]> {
   return apiFetch<Card[]>("/cards");
 }
 
+/** GET /api/cards/{uuid} — a single card (404 when not owned). */
+export function fetchCard(uuid: string): Promise<Card> {
+  return apiFetch<Card>(`/cards/${uuid}`);
+}
+
+/** GET /api/cards/{uuid}/transactions — a FLAT array of card transactions. */
 export function fetchCardTransactions(uuid: string): Promise<CardTransaction[]> {
   return apiFetch<CardTransaction[]>(`/cards/${uuid}/transactions`);
+}
+
+/** GET /api/card-offers — issuable BINs with their XOF issuance price. */
+export function fetchCardOffers(): Promise<CardOffer[]> {
+  return apiFetch<CardOffer[]>("/card-offers");
+}
+
+/**
+ * POST /api/cards — start an asynchronous card issuance. Guarded by
+ * `pin.ticket:card_issue`, so the caller passes the `card_issue` ticket.
+ */
+export function issueCard(
+  input: IssueCardInput,
+  pinTicket: string,
+): Promise<CardIssuanceOrder> {
+  return apiFetch<CardIssuanceOrder>("/cards", {
+    method: "POST",
+    body: input,
+    pinTicket,
+  });
+}
+
+/** GET /api/cards/{uuid}/recharge/quote — USD credit and XOF wallet debit. */
+export function fetchCardRechargeQuote(
+  uuid: string,
+  amountUsdMinor: number,
+): Promise<CardRechargeQuote> {
+  const query = new URLSearchParams({
+    amount_usd_minor: String(amountUsdMinor),
+  });
+  return apiFetch<CardRechargeQuote>(
+    `/cards/${uuid}/recharge/quote?${query.toString()}`,
+  );
+}
+
+/**
+ * POST /api/cards/{uuid}/recharge — fund a card from the XOF wallet. Guarded by
+ * `pin.ticket:card_recharge,card,uuid`; the ticket is scoped to the card.
+ */
+export function rechargeCard(
+  uuid: string,
+  input: RechargeCardInput,
+  pinTicket: string,
+): Promise<CardRecharge> {
+  return apiFetch<CardRecharge>(`/cards/${uuid}/recharge`, {
+    method: "POST",
+    body: input,
+    pinTicket,
+  });
+}
+
+/** GET /api/cards/{uuid}/cashout/quote — USD debit and XOF wallet credit. */
+export function fetchCardCashoutQuote(
+  uuid: string,
+  amountUsdMinor: number,
+): Promise<CardCashoutQuote> {
+  const query = new URLSearchParams({
+    amount_usd_minor: String(amountUsdMinor),
+  });
+  return apiFetch<CardCashoutQuote>(
+    `/cards/${uuid}/cashout/quote?${query.toString()}`,
+  );
+}
+
+/**
+ * POST /api/cards/{uuid}/cashout — repatriate USD from a card to the XOF wallet.
+ * Guarded by `pin.ticket:card_cashout,card,uuid`.
+ */
+export function cashoutCard(
+  uuid: string,
+  input: CashoutCardInput,
+  pinTicket: string,
+): Promise<CardCashout> {
+  return apiFetch<CardCashout>(`/cards/${uuid}/cashout`, {
+    method: "POST",
+    body: input,
+    pinTicket,
+  });
+}
+
+/**
+ * POST /api/cards/{uuid}/reveal — return the short-lived PAN/CVV/expiry. Guarded
+ * by `pin.ticket:reveal_pan,card,uuid`. The response is `no-store`; the caller
+ * MUST never persist, cache or log the secrets.
+ */
+export function revealCard(
+  uuid: string,
+  pinTicket: string,
+): Promise<CardReveal> {
+  return apiFetch<CardReveal>(`/cards/${uuid}/reveal`, {
+    method: "POST",
+    pinTicket,
+  });
+}
+
+/** POST /api/cards/{uuid}/suspend — freeze a card. */
+export function suspendCard(uuid: string): Promise<Card> {
+  return apiFetch<Card>(`/cards/${uuid}/suspend`, { method: "POST" });
+}
+
+/** POST /api/cards/{uuid}/enable — unfreeze a card. */
+export function enableCard(uuid: string): Promise<Card> {
+  return apiFetch<Card>(`/cards/${uuid}/enable`, { method: "POST" });
+}
+
+/** POST /api/cards/{uuid}/cancel — cancel a card for good. */
+export function cancelCard(uuid: string): Promise<Card> {
+  return apiFetch<Card>(`/cards/${uuid}/cancel`, { method: "POST" });
 }
 
 export function fetchReferral(): Promise<Referral> {

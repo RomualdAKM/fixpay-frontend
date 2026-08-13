@@ -37,7 +37,7 @@ const TABS: Array<{
   {
     id: "cards",
     label: "Cartes",
-    href: "/cards/visa-4291",
+    href: "/cards",
     icon: CreditCard,
     match: ["/cards", "/payment"],
   },

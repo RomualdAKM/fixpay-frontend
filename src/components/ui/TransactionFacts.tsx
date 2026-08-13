@@ -1,7 +1,14 @@
 import { cn } from "@/lib/utils";
 
 interface TransactionFactsProps {
-  /** Frais de l'opération, déjà formatés : « Gratuit », « 1 % (min. 100 FCFA) ». */
+  /**
+   * Libellé de la première colonne. Défaut « Frais ». À surcharger quand la
+   * valeur n'est PAS un frais mais un autre fait chiffré de l'opération (le
+   * principal crédité/retiré des flux carte), pour ne jamais présenter un
+   * montant en jeu sous une étiquette qui le travestit.
+   */
+  feeLabel?: string;
+  /** Valeur de la première colonne, déjà formatée (« Gratuit », « 50.00 USD »). */
   fee: string;
   /** Délai de crédit annoncé : « Instantané », « Sous 5 min ». */
   delay: string;
@@ -22,13 +29,14 @@ interface TransactionFactsProps {
  * à deux champs (audit : « Densité fintech absente »).
  */
 export function TransactionFacts({
+  feeLabel = "Frais",
   fee,
   delay,
   limit,
   balanceAfter,
 }: TransactionFactsProps) {
   const facts = [
-    { label: "Frais", value: fee },
+    { label: feeLabel, value: fee },
     { label: "Délai", value: delay },
     ...(limit ? [{ label: "Plafond restant", value: limit }] : []),
   ];
