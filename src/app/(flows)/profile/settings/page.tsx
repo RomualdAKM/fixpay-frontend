@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Check, ChevronDown, ChevronRight } from "lucide-react";
 
+import { LogoutButton } from "@/components/auth/LogoutButton";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useTheme } from "@/components/theme/ThemeProvider";
@@ -442,13 +443,10 @@ export default function SettingsPage() {
         </div>
 
         {/* Déconnexion : hors grille, sur l'axe du contenu, bornée comme un CTA
-            — danger discret, en bas, jamais en aplat de marque. */}
-        <Link
-          href="/onboarding"
-          className="border-border bg-surface text-danger hover:bg-surface-2 focus-visible:ring-danger/60 mt-12 flex h-12 w-full items-center justify-center rounded-md border text-[14px] font-semibold transition-colors focus-visible:ring-2 focus-visible:outline-none lg:mx-auto lg:max-w-[320px]"
-        >
-          Se déconnecter
-        </Link>
+            — danger discret, en bas, jamais en aplat de marque. Invalide la
+            session (POST /api/logout) et vide le cache avant de rejoindre le
+            login. */}
+        <LogoutButton className="mt-12 lg:mx-auto lg:max-w-[320px]" />
       </main>
 
       <BottomNav />

@@ -11,6 +11,10 @@ interface ButtonProps {
   /** When provided, renders a styled Next.js `<Link>` instead of a `<button>`. */
   href?: string;
   onClick?: () => void;
+  /** Native button type; defaults to `"button"`. Use `"submit"` inside forms. */
+  type?: "button" | "submit";
+  /** Disables the button (ignored for the `<Link>` variant). */
+  disabled?: boolean;
   className?: string;
 }
 
@@ -46,12 +50,15 @@ export function Button({
   children,
   href,
   onClick,
+  type = "button",
+  disabled = false,
   className,
 }: ButtonProps) {
   const classes = cn(
     "inline-flex select-none items-center justify-center whitespace-nowrap transition-opacity active:opacity-90",
     // Desktop-only affordances: keyboard focus ring (no effect on mobile).
     "focus-visible:ring-primary/60 focus-visible:ring-2 focus-visible:outline-none",
+    disabled && "pointer-events-none opacity-60",
     VARIANT_CLASSES[variant],
     className,
   );
@@ -65,7 +72,12 @@ export function Button({
   }
 
   return (
-    <button type="button" onClick={onClick} className={classes}>
+    <button
+      type={type}
+      onClick={onClick}
+      disabled={disabled}
+      className={classes}
+    >
       {children}
     </button>
   );

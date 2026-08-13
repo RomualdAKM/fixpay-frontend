@@ -1,7 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import { DM_Mono, DM_Sans } from "next/font/google";
 
+import { ErrorBoundary } from "@/components/feedback/ErrorBoundary";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
+import { AuthProvider } from "@/lib/auth";
+import { QueryProvider } from "@/lib/query/QueryProvider";
 import { THEME_STORAGE_KEY } from "@/lib/theme";
 
 import "./globals.css";
@@ -60,15 +63,22 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body>
-        <ThemeProvider>
-          {/* Mobile canvas: the design is authored at 390px; the shell stays
-              fluid up to 430px and centers on larger viewports. From `lg` up the
-              constraint is released so the desktop shell (Sidebar + content
-              area, see AppShell) can span the full width. */}
-          <div className="relative mx-auto flex min-h-dvh w-full max-w-[430px] flex-col overflow-x-hidden lg:max-w-none lg:overflow-x-visible">
-            {children}
-          </div>
-        </ThemeProvider>
+        <ErrorBoundary>
+          <ThemeProvider>
+            <QueryProvider>
+              <AuthProvider>
+                {/* Mobile canvas: the design is authored at 390px; the shell
+                    stays fluid up to 430px and centers on larger viewports.
+                    From `lg` up the constraint is released so the desktop shell
+                    (Sidebar + content area, see AppShell) can span the full
+                    width. */}
+                <div className="relative mx-auto flex min-h-dvh w-full max-w-[430px] flex-col overflow-x-hidden lg:max-w-none lg:overflow-x-visible">
+                  {children}
+                </div>
+              </AuthProvider>
+            </QueryProvider>
+          </ThemeProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );

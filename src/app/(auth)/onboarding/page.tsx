@@ -32,7 +32,7 @@ const RAILS = ["Orange Money", "Wave", "MTN"];
  * coût sont donc lus dans le même viewport, avant le bouton, et pas après.
  */
 const FACTS = [
-  { label: "Émission", value: "3 000 FCFA" },
+  { label: "Émission", value: formatFcfa(3000) },
   { label: "Délai", value: "sous 5 min" },
   { label: "Plafond mensuel", value: formatFcfa(cards[0]!.monthlyLimit) },
 ];
@@ -190,7 +190,7 @@ export default function OnboardingPage() {
             <div className="mt-8 lg:mt-9">
               <Button
                 variant="primary"
-                href="/"
+                href="/register"
                 className="lg:h-[54px] lg:w-auto lg:px-12 lg:text-[16px]"
               >
                 Commencer
@@ -199,7 +199,7 @@ export default function OnboardingPage() {
               <p className="text-text-secondary mt-4 text-[15px] leading-[20px] lg:text-[16px] lg:leading-[22px]">
                 Déjà un compte ?{" "}
                 <Link
-                  href="/"
+                  href="/login"
                   className="text-primary-light font-semibold underline-offset-4 hover:underline"
                 >
                   Se connecter
