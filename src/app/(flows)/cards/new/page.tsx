@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Check } from "lucide-react";
 
 import { BottomNav } from "@/components/layout/BottomNav";
@@ -9,6 +8,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { AmountInput } from "@/components/ui/AmountInput";
 import { Button } from "@/components/ui/Button";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { InfoBanner } from "@/components/ui/InfoBanner";
 import { SectionLabel } from "@/components/ui/SectionLabel";
 import { SelectableRow } from "@/components/ui/SelectableRow";
 import { StepProgress } from "@/components/ui/StepProgress";
@@ -244,8 +244,6 @@ function CardOfferCard({
  * Fin → /cards/new/success.
  */
 export default function CreateCardPage() {
-  const router = useRouter();
-
   const [step, setStep] = useState(1);
   const [brand, setBrand] = useState<CardBrand>("visa");
   const [name, setName] = useState("");
@@ -275,11 +273,10 @@ export default function CreateCardPage() {
     setOperator(operatorsFor(next.code)[0] ?? "");
   }
 
+  /** Avance dans le wizard. Le paiement final (étape 5) n'est pas encore
+   *  raccordé à POST /api/cards, donc l'écran ne conclut aucune émission. */
   function handleContinue() {
-    if (step >= 5) {
-      router.push("/cards/new/success");
-      return;
-    }
+    if (step >= 5) return;
     setStep((s) => s + 1);
   }
 
@@ -449,6 +446,15 @@ export default function CreateCardPage() {
             <div className="mt-4 lg:max-w-[520px]">
               <TransactionFacts fee="Gratuit" delay="Activation immédiate" />
             </div>
+
+            {/* L'émission (POST /api/cards, PIN card_issue, ordre asynchrone)
+                n'est pas encore raccordée : on ne conclut aucun achat. */}
+            <div className="mt-4 lg:max-w-[520px]">
+              <InfoBanner>
+                L&apos;achat de carte sera bientôt disponible. Aucun paiement ne
+                sera débité pour l&apos;instant.
+              </InfoBanner>
+            </div>
           </section>
         )}
 
@@ -467,12 +473,22 @@ export default function CreateCardPage() {
                 {price}
               </span>
             </div>
-            <Button
-              onClick={handleContinue}
-              className="lg:w-auto lg:shrink-0 lg:px-10"
-            >
-              {step === 5 ? `Payer ${price}` : "Continuer"}
-            </Button>
+            {step === 5 ? (
+              <button
+                type="button"
+                disabled
+                className="border-border bg-surface-2 text-text-muted inline-flex h-[50px] w-full cursor-not-allowed items-center justify-center rounded-md border text-[15px] font-semibold lg:w-auto lg:shrink-0 lg:px-10"
+              >
+                Payer {price}
+              </button>
+            ) : (
+              <Button
+                onClick={handleContinue}
+                className="lg:w-auto lg:shrink-0 lg:px-10"
+              >
+                Continuer
+              </Button>
+            )}
           </div>
         </StickyActionBar>
       </main>

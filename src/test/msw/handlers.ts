@@ -1,6 +1,6 @@
 import { HttpResponse, http } from "msw";
 
-import type { User } from "@/lib/api/types";
+import type { Money, User } from "@/lib/api/types";
 
 /**
  * MSW handlers mirroring the Laravel API, faithful to the
@@ -21,6 +21,11 @@ export function errorEnvelope(
   errors: Record<string, unknown> | null = null,
 ) {
   return { message, data: null, errors };
+}
+
+/** XOF money helper (scale 0 — minor equals major, always an integer). */
+export function xof(amountMinor: number): Money {
+  return { amount_minor: amountMinor, currency: "XOF", scale: 0 };
 }
 
 export const testUser: User = {

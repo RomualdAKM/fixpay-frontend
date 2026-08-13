@@ -2,10 +2,16 @@ import { apiFetch } from "./client";
 import type {
   Card,
   CardTransaction,
+  CreateDepositInput,
+  CreateWithdrawalInput,
+  Deposit,
+  LinkMobileMoneyAccountInput,
   LoginInput,
   LoginResult,
   MobileMoneyAccount,
   NotificationList,
+  Operator,
+  OperatorPurpose,
   Paginated,
   PinTicket,
   Referral,
@@ -14,6 +20,8 @@ import type {
   VerifyPinInput,
   Wallet,
   WalletTransaction,
+  Withdrawal,
+  WithdrawalQuote,
 } from "./types";
 
 /**
@@ -72,10 +80,96 @@ export function fetchWallet(): Promise<Wallet> {
   return apiFetch<Wallet>("/wallet");
 }
 
-export function fetchWalletTransactions(): Promise<
-  Paginated<WalletTransaction>
-> {
-  return apiFetch<Paginated<WalletTransaction>>("/wallet/transactions");
+export function fetchWalletTransactions(
+  page = 1,
+): Promise<Paginated<WalletTransaction>> {
+  return apiFetch<Paginated<WalletTransaction>>(
+    `/wallet/transactions?page=${page}`,
+  );
+}
+
+/** GET /api/operators — curated Mobile Money operators, optionally by purpose. */
+export function fetchOperators(purpose?: OperatorPurpose): Promise<Operator[]> {
+  const query = purpose ? `?purpose=${purpose}` : "";
+  return apiFetch<Operator[]>(`/operators${query}`);
+}
+
+// ---- Mobile Money accounts ---------------------------------------------
+
+/**
+ * POST /api/mobile-money-accounts — link an account. Guarded by
+ * `pin.ticket:link_mm_account`, so a fresh PIN ticket is required.
+ */
+export function linkMobileMoneyAccount(
+  input: LinkMobileMoneyAccountInput,
+  pinTicket: string,
+): Promise<MobileMoneyAccount> {
+  return apiFetch<MobileMoneyAccount>("/mobile-money-accounts", {
+    method: "POST",
+    body: input,
+    pinTicket,
+  });
+}
+
+/** DELETE /api/mobile-money-accounts/{uuid} — unlink an account. */
+export function unlinkMobileMoneyAccount(uuid: string): Promise<null> {
+  return apiFetch<null>(`/mobile-money-accounts/${uuid}`, { method: "DELETE" });
+}
+
+/** PUT /api/mobile-money-accounts/{uuid}/primary — mark as the primary account. */
+export function setPrimaryMobileMoneyAccount(
+  uuid: string,
+): Promise<MobileMoneyAccount> {
+  return apiFetch<MobileMoneyAccount>(
+    `/mobile-money-accounts/${uuid}/primary`,
+    { method: "PUT" },
+  );
+}
+
+// ---- Deposits ----------------------------------------------------------
+
+/** POST /api/deposits — initiate a Mobile Money pay-in. */
+export function createDeposit(input: CreateDepositInput): Promise<Deposit> {
+  return apiFetch<Deposit>("/deposits", { method: "POST", body: input });
+}
+
+/** GET /api/deposits/{uuid} — poll a deposit until a final status. */
+export function fetchDeposit(uuid: string): Promise<Deposit> {
+  return apiFetch<Deposit>(`/deposits/${uuid}`);
+}
+
+// ---- Withdrawals -------------------------------------------------------
+
+/** GET /api/withdrawals/quote — fee breakdown and real wallet debit. */
+export function fetchWithdrawalQuote(params: {
+  operator: string;
+  amount_minor: number;
+}): Promise<WithdrawalQuote> {
+  const query = new URLSearchParams({
+    operator: params.operator,
+    amount_minor: String(params.amount_minor),
+  });
+  return apiFetch<WithdrawalQuote>(`/withdrawals/quote?${query.toString()}`);
+}
+
+/**
+ * POST /api/withdrawals — initiate a payout. Guarded by `pin.ticket:withdraw`,
+ * so the caller must pass the ticket issued for the `withdraw` action.
+ */
+export function createWithdrawal(
+  input: CreateWithdrawalInput,
+  pinTicket: string,
+): Promise<Withdrawal> {
+  return apiFetch<Withdrawal>("/withdrawals", {
+    method: "POST",
+    body: input,
+    pinTicket,
+  });
+}
+
+/** GET /api/withdrawals/{uuid} — poll a withdrawal until a final status. */
+export function fetchWithdrawal(uuid: string): Promise<Withdrawal> {
+  return apiFetch<Withdrawal>(`/withdrawals/${uuid}`);
 }
 
 export function fetchCards(): Promise<Card[]> {

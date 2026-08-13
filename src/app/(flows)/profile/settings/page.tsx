@@ -9,6 +9,7 @@ import { BottomNav } from "@/components/layout/BottomNav";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useTheme } from "@/components/theme/ThemeProvider";
 import { SettingsToggleRow } from "@/components/ui/SettingsToggleRow";
+import { MobileMoneyAccountsSection } from "@/components/wallet/MobileMoneyAccountsSection";
 import { formatFcfa } from "@/lib/format";
 import { settingsOptions } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
@@ -263,7 +264,6 @@ export default function SettingsPage() {
   const [langue, setLangue] = useState(settingsOptions.langue);
   const [devise, setDevise] = useState(settingsOptions.devise);
   const [biometrics, setBiometrics] = useState(true);
-  const [waveLinked, setWaveLinked] = useState(true);
   const [saved, setSaved] = useState(false);
   const savedTimer = useRef<number | null>(null);
 
@@ -398,33 +398,9 @@ export default function SettingsPage() {
             <SettingsSection
               className="mt-12"
               title="Comptes Mobile Money"
-              help="Un compte est lié lors de votre premier dépôt depuis cet opérateur."
+              help="Liez un compte pour vos dépôts et retraits ; la liaison est confirmée par votre code PIN."
             />
-            <div className="mt-4">
-              {waveLinked ? (
-                /* Le compte lié porte enfin la seule action qui le concerne :
-                   le délier. Il n'affichait qu'un numéro masqué inerte. */
-                <SettingsRow
-                  title="Wave"
-                  value="+225 07 •• •• 41"
-                  action="Délier"
-                  onAction={() => {
-                    setWaveLinked(false);
-                    acknowledge();
-                  }}
-                  divider
-                />
-              ) : (
-                <p className="text-text-muted border-border border-b py-4 text-[12.5px] leading-[18px]">
-                  Aucun compte Mobile Money n&apos;est lié.
-                </p>
-              )}
-              <SettingsRow
-                title="Ajouter un opérateur"
-                value="Orange Money, MTN"
-                href="/wallet/deposit"
-              />
-            </div>
+            <MobileMoneyAccountsSection />
 
             <SettingsSection className="mt-12" title="À propos" />
             <div className="mt-4">

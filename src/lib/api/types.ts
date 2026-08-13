@@ -102,6 +102,63 @@ export interface MobileMoneyAccount {
   linked_at: string;
 }
 
+/** A curated Mobile Money operator (OperatorResource), GET /api/operators. */
+export interface Operator {
+  code: string;
+  name: string;
+  /** ISO-3166 alpha-2 country of the operator, e.g. "CI", "SN". */
+  country: string;
+  currency: CurrencyCode;
+  supports_payin: boolean;
+  supports_payout: boolean;
+}
+
+/** Query filter for GET /api/operators. */
+export type OperatorPurpose = "payin" | "payout";
+
+/**
+ * GET /api/withdrawals/quote `data` (WithdrawalQuoteResource). Every leg is a
+ * Money object; `client_debit` is what the wallet is actually debited.
+ */
+export interface WithdrawalQuote {
+  amount: Money;
+  provider_cost: Money;
+  fixpay_fee: Money;
+  client_debit: Money;
+}
+
+/** POST /api/deposits body (InitiateDepositRequest). Amount is in minor units. */
+export interface CreateDepositInput {
+  operator: string;
+  amount_minor: number;
+  currency: CurrencyCode;
+  phone?: string;
+  return_url?: string;
+}
+
+/** Beneficiary of a withdrawal (InitiateWithdrawalRequest `recipient`). */
+export interface WithdrawalRecipient {
+  phone: string;
+  first_name: string;
+  last_name: string;
+  email?: string;
+}
+
+/** POST /api/withdrawals body (InitiateWithdrawalRequest). */
+export interface CreateWithdrawalInput {
+  operator: string;
+  amount_minor: number;
+  currency: CurrencyCode;
+  recipient: WithdrawalRecipient;
+}
+
+/** POST /api/mobile-money-accounts body (LinkMobileMoneyAccountRequest). */
+export interface LinkMobileMoneyAccountInput {
+  operator: string;
+  phone_e164: string;
+  is_primary?: boolean;
+}
+
 /** App\Http\Resources\CardResource. */
 export interface Card {
   uuid: string;

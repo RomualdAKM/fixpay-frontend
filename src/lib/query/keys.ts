@@ -11,4 +11,9 @@ export const queryKeys = {
   referral: ["referral"] as const,
   notifications: ["notifications"] as const,
   mobileMoneyAccounts: ["mobile-money-accounts"] as const,
+  operators: (purpose?: string) => ["operators", purpose ?? "all"] as const,
+  deposit: (uuid: string) => ["deposits", uuid] as const,
+  withdrawal: (uuid: string) => ["withdrawals", uuid] as const,
+  withdrawalQuote: (operator: string, amountMinor: number) =>
+    ["withdrawals", "quote", operator, amountMinor] as const,
 } as const;

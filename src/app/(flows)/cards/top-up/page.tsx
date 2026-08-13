@@ -7,7 +7,6 @@ import { ChevronLeft } from "lucide-react";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { AmountInput } from "@/components/ui/AmountInput";
 import { BalanceCard } from "@/components/ui/BalanceCard";
-import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { InfoBanner } from "@/components/ui/InfoBanner";
 import { QuickAmountChips } from "@/components/ui/QuickAmountChips";
@@ -72,7 +71,6 @@ export default function CardTopUpPage() {
   const balanceAfter = enough
     ? formatFcfa(wallet.balance - transferred)
     : undefined;
-  const ready = transferred >= cardTopUpFacts.min && enough;
 
   return (
     <>
@@ -179,19 +177,19 @@ export default function CardTopUpPage() {
             `StickyActionBar`. */}
         <StickyActionBar>
           <div>
-            {ready ? (
-              <Button href="/cards/top-up/success" className="lg:max-w-[320px]">
-                Alimenter la carte
-              </Button>
-            ) : (
-              <button
-                type="button"
-                disabled
-                className="border-border bg-surface-2 text-text-muted inline-flex h-[50px] w-full cursor-not-allowed items-center justify-center rounded-md border text-[15px] font-semibold lg:max-w-[320px]"
-              >
-                Alimenter la carte
-              </button>
-            )}
+            {/* L'alimentation de carte n'est pas encore raccordée à l'API
+                (POST /api/cards/{uuid}/recharge, PIN card_recharge, conversion
+                FX) : le CTA reste inactif plutôt que de simuler un succès. */}
+            <p className="text-text-muted mb-3 text-[11.5px] leading-[16px] lg:max-w-[320px]">
+              L&apos;alimentation de carte sera bientôt disponible.
+            </p>
+            <button
+              type="button"
+              disabled
+              className="border-border bg-surface-2 text-text-muted inline-flex h-[50px] w-full cursor-not-allowed items-center justify-center rounded-md border text-[15px] font-semibold lg:max-w-[320px]"
+            >
+              Alimenter la carte
+            </button>
           </div>
         </StickyActionBar>
       </main>

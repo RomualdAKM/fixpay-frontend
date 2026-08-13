@@ -8,7 +8,6 @@ import { ChevronLeft } from "lucide-react";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { AmountInput } from "@/components/ui/AmountInput";
 import { BalanceCard } from "@/components/ui/BalanceCard";
-import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { InfoBanner } from "@/components/ui/InfoBanner";
 import { QuickAmountChips } from "@/components/ui/QuickAmountChips";
@@ -60,7 +59,6 @@ export default function CardWithdrawPage() {
   const balanceAfter = enough
     ? formatFcfa(sourceCard.balance - withdrawn)
     : undefined;
-  const ready = withdrawn >= cardWithdrawFacts.min && enough;
 
   return (
     <>
@@ -165,22 +163,19 @@ export default function CardWithdrawPage() {
           {/* Le rythme de tête (marge, filet, padding) appartient désormais à
               la barre elle-même — voir `StickyActionBar`. */}
           <div>
-            {ready ? (
-              <Button
-                href="/cards/withdraw/success"
-                className="lg:max-w-[320px]"
-              >
-                Confirmer le retrait
-              </Button>
-            ) : (
-              <button
-                type="button"
-                disabled
-                className="border-border bg-surface-2 text-text-muted inline-flex h-[50px] w-full cursor-not-allowed items-center justify-center rounded-md border text-[15px] font-semibold lg:max-w-[320px]"
-              >
-                Confirmer le retrait
-              </button>
-            )}
+            {/* Le retrait de carte n'est pas encore raccordé à l'API
+                (POST /api/cards/{uuid}/cashout, PIN card_cashout, conversion
+                FX) : le CTA reste inactif plutôt que de simuler un succès. */}
+            <p className="text-text-muted mb-3 text-[11.5px] leading-[16px] lg:max-w-[320px]">
+              Le retrait de carte sera bientôt disponible.
+            </p>
+            <button
+              type="button"
+              disabled
+              className="border-border bg-surface-2 text-text-muted inline-flex h-[50px] w-full cursor-not-allowed items-center justify-center rounded-md border text-[15px] font-semibold lg:max-w-[320px]"
+            >
+              Confirmer le retrait
+            </button>
           </div>
         </StickyActionBar>
       </main>

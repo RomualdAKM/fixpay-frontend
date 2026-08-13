@@ -1,28 +1,35 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 
 import { AppHeader } from "@/components/layout/AppHeader";
 import { BottomNav } from "@/components/layout/BottomNav";
+import { InlineError } from "@/components/feedback/InlineError";
 import { CardRow, CardRowList } from "@/components/ui/CardRow";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { SectionHeader } from "@/components/ui/SectionHeader";
-import { TransactionItem } from "@/components/ui/TransactionItem";
+import { WalletMovements } from "@/components/ui/WalletMovements";
 import {
   WalletHeroActions,
   WalletHeroCard,
 } from "@/components/ui/WalletHeroCard";
+import { useWallet, useWalletTransactions } from "@/lib/api/moneyHooks";
+import { walletTransactionToRow } from "@/lib/api/presenters";
 import { formatAmount, formatFcfa } from "@/lib/format";
-import {
-  cards,
-  depositFacts,
-  homeTransactions,
-  verification,
-  wallet,
-  withdrawFacts,
-} from "@/lib/mock-data";
+import { formatMoney } from "@/lib/money";
+import { cards, depositFacts, verification, withdrawFacts } from "@/lib/mock-data";
+
+/** 145px hero placeholder while the balance loads. */
+function HeroSkeleton() {
+  return (
+    <div
+      className="bg-surface-2 h-[145px] animate-pulse rounded-lg"
+      aria-hidden="true"
+    />
+  );
+}
 
 /**
  * Écran 02 · Accueil — LE TABLEAU DE BORD, et le seul.
@@ -66,6 +73,19 @@ export default function HomePage() {
   // confidentialité, pas un réglage par bloc.
   const [hidden, setHidden] = useState(false);
 
+  const walletQuery = useWallet();
+  const txQuery = useWalletTransactions();
+
+  // Le tableau de bord montre les mouvements récents : la première page du
+  // relevé, déjà triée par le backend (plus récent en tête).
+  const recentRows = useMemo(
+    () =>
+      (txQuery.data?.pages[0]?.items ?? []).map((tx, index) =>
+        walletTransactionToRow(tx, index),
+      ),
+    [txQuery.data],
+  );
+
   return (
     <>
       <main className="px-5 pt-[50px] pb-24 lg:mx-auto lg:w-full lg:max-w-[1080px] lg:px-10 lg:pt-9 lg:pb-12">
@@ -75,16 +95,31 @@ export default function HomePage() {
           {/* Colonne A — argent : solde, vérification, cartes, plafonds */}
           <div className="contents lg:block">
             <div className="mt-4 lg:mt-0">
-              <WalletHeroCard
-                variant="compact"
-                label="Solde disponible"
-                amount={formatFcfa(wallet.balance)}
-                hidden={hidden}
-                onToggleHidden={() => setHidden((v) => !v)}
-                watermark={false}
-              >
-                <WalletHeroActions />
-              </WalletHeroCard>
+              {walletQuery.isPending ? (
+                <HeroSkeleton />
+              ) : walletQuery.isError ? (
+                <div>
+                  <InlineError error={walletQuery.error} />
+                  <button
+                    type="button"
+                    onClick={() => void walletQuery.refetch()}
+                    className="text-primary-light mt-3 text-[13px] leading-[18px] font-medium underline-offset-4 hover:underline"
+                  >
+                    Réessayer
+                  </button>
+                </div>
+              ) : (
+                <WalletHeroCard
+                  variant="compact"
+                  label="Solde disponible"
+                  amount={formatMoney(walletQuery.data.balance)}
+                  hidden={hidden}
+                  onToggleHidden={() => setHidden((v) => !v)}
+                  watermark={false}
+                >
+                  <WalletHeroActions />
+                </WalletHeroCard>
+              )}
             </div>
 
             {/* LE COÛT DES DEUX ACTIONS, sous les deux actions. « Dépôt » et
@@ -186,22 +221,17 @@ export default function HomePage() {
                 actionLabel="Tout voir"
                 actionHref="/statistics"
               />
-              {/* Liste entière aux deux tailles. La troncature mobile à trois
-                  rangées avait été posée pour qu'aucun montant ne soit scié par
-                  la BottomNav ; elle cachait désormais les deux tiers du flux
-                  sur une page qui défile de toute façon, et la nav est opaque —
-                  c'est le `pb-24` qui garantit que la dernière rangée la
-                  dépasse. Le filet de la dernière rangée tombe : une hairline
-                  sans rien après elle se lit comme un bug, pas comme une
-                  promesse de suite. */}
-              <div className="mt-3 [&>*:last-child]:border-b-0">
-                {homeTransactions.map((transaction) => (
-                  <TransactionItem
-                    key={transaction.id}
-                    transaction={transaction}
-                  />
-                ))}
-              </div>
+              {/* Mouvements réels du portefeuille (première page du relevé),
+                  avec leurs états de chargement / erreur / vide réellement
+                  câblés. La liste s'arrête à la dernière rangée sans filet
+                  orphelin ; « Tout voir » mène au relevé complet. */}
+              <WalletMovements
+                rows={recentRows}
+                loading={txQuery.isPending}
+                error={txQuery.isError ? txQuery.error : undefined}
+                onRetry={() => void txQuery.refetch()}
+                emptyLabel="Aucune opération pour le moment."
+              />
             </section>
           </div>
         </div>

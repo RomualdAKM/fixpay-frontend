@@ -1,115 +1,58 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check } from "lucide-react";
+import { Check, Loader2 } from "lucide-react";
 
 import { BottomNav } from "@/components/layout/BottomNav";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { InlineError } from "@/components/feedback/InlineError";
 import { AmountInput } from "@/components/ui/AmountInput";
 import { Button } from "@/components/ui/Button";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { SectionLabel } from "@/components/ui/SectionLabel";
 import { StepProgress } from "@/components/ui/StepProgress";
 import { StickyActionBar } from "@/components/ui/StickyActionBar";
-import { TransactionFacts } from "@/components/ui/TransactionFacts";
+import {
+  useCreateDeposit,
+  useDeposit,
+  useOperators,
+  useWallet,
+} from "@/lib/api/moneyHooks";
+import { isDepositFinal } from "@/lib/api/status";
+import type { Operator } from "@/lib/api/types";
 import { formatFcfa } from "@/lib/format";
-import { countries, depositFacts, wallet } from "@/lib/mock-data";
+import { majorUnits, xofMinor } from "@/lib/money";
+import { groupOperatorsByCountry } from "@/lib/operators";
 import { cn } from "@/lib/utils";
 
-/* ---------------------------------------------------------------------------
-   RYTHME VERTICAL DES 5 ÉCRANS DE FLUX (04 → 08)
-
-   Une seule échelle, appliquée au RÔLE du bloc et non à sa position :
-     8px  (mt-2)   un élément et son aide immédiate (champ → « Minimum … »)
-     12px (mt-3)   un en-tête de groupe et son contenu
-     16px (mt-4)   deux blocs du même groupe (bandeau de contexte → ressource)
-     32px (mt-8)   deux GROUPES de sens différent
-   Rien entre 16 et 32 : c'est ce continuum de valeurs voisines (20/24/28) qui
-   faisait lire les écrans comme une liste d'éléments équidistants.
-
-   SQUELETTE COMMUN aux 5 flux, pour qu'ils se ressemblent enfin :
-     en-tête → [contexte du flux] → grille 2 colonnes à lg
-       · colonne de saisie      : ce que l'utilisateur remplit
-       · colonne de vérité      : ce que l'opération va coûter et produire,
-                                  toujours terminée par <TransactionFacts>
-     → <StickyActionBar> hors grille, un seul CTA par écran.
-   En mobile la grille retombe en une colonne : la colonne de vérité vient donc
-   toujours JUSTE avant le CTA, ce qui est aussi l'ordre de lecture attendu.
-   --------------------------------------------------------------------------- */
 const FLOW_MAIN =
   "px-5 pt-[54px] pb-24 lg:mx-auto lg:w-full lg:max-w-[840px] lg:px-10 lg:pt-9 lg:pb-12";
 const FLOW_GRID = "mt-8 lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-10";
 const FLOW_ASIDE = "mt-8 lg:mt-0";
 
-/**
- * Indicatif et opérateurs RÉELLEMENT présents dans chaque pays. L'audit
- * reprochait « un mot par ligne » : une liste de pays sans indicatif ni
- * opérateur n'apprend rien de plus que le nom du pays, et laissait croire que
- * les quatre mêmes opérateurs existaient partout. Ces données sont locales
- * (mock-data ne modélise que le couple code/nom) comme les étapes 2 à 4.
- */
-const COUNTRY_META: Record<string, { dial: string; operators: string[] }> = {
-  BJ: { dial: "+229", operators: ["mtn", "moov", "celtiis"] },
-  BF: { dial: "+226", operators: ["orange", "moov"] },
-  CI: { dial: "+225", operators: ["orange", "mtn", "moov", "wave"] },
-  ML: { dial: "+223", operators: ["orange", "moov"] },
-  SN: { dial: "+221", operators: ["orange", "free", "wave"] },
-  TG: { dial: "+228", operators: ["moov", "tmoney"] },
-};
+/** Plancher indicatif (défaut backend `zayono.min_amount_minor`) ; la borne
+ *  exacte est validée côté serveur et renvoyée en 422 si dépassée. */
+const MIN_AMOUNT_FCFA = 200;
 
-const OPERATOR_NAMES: Record<string, string> = {
-  orange: "Orange Money",
-  wave: "Wave",
-  mtn: "MTN MoMo",
-  moov: "Moov Money",
-  free: "Free Money",
-  celtiis: "Celtiis Cash",
-  tmoney: "T-Money",
-};
-
-/**
- * Dernier compte utilisé — le compte Wave lié de l'écran 16. L'audit relevait
- * l'absence de section « Récemment utilisé » sur un écran dont 90 % des
- * parcours réels repartent du même compte : c'est la seule chose qui évite de
- * redérouler quatre étapes pour un dépôt hebdomadaire.
- */
-const RECENT = {
-  country: "CI",
-  operator: "wave",
-  dial: "+225",
-  phone: "07 •• •• 41",
-} as const;
-
-/** Libellés des 4 étapes. */
 const STEP_LABELS = ["Pays", "Opérateur", "Numéro", "Montant"] as const;
 
-/** Montant saisi au clavier natif → entier de francs (« 50 000 » → 50000). */
 function parseAmount(raw: string): number {
   return Number(raw.replace(/\D/g, "")) || 0;
 }
 
-/**
- * Longueur significative d'un numéro, espaces exclus. On ne compte pas que les
- * CHIFFRES : le compte repris depuis « Récemment utilisé » arrive masqué
- * (« 07 •• •• 41 »), et un compte déjà connu ne doit pas être invalidé par sa
- * propre représentation.
- */
-function phoneLength(raw: string): number {
-  return raw.replace(/\s/g, "").length;
+function phoneDigits(raw: string): string {
+  return raw.replace(/\D/g, "");
 }
 
-/**
- * Rangée d'une LISTE, pas carte flottante. Les six pays étaient six surfaces
- * autonomes — douze bordures dessinées pour une seule énumération (marqueur
- * [F] de l'audit). Une liste est ici UNE surface, et ses rangées ne sont
- * séparées que par un filet.
- *
- * La pastille vide passe de `border-border-strong` (1,55:1 sur la surface,
- * sous le seuil de 3:1 exigé d'un composant d'interface) à `border-text-muted`
- * (4,2:1 mesuré sur le même fond) : c'est l'affordance de sélection d'un écran
- * dont la sélection est l'unique fonction.
- */
+/** Compose un numéro E.164 à partir de l'indicatif du pays et de la saisie. */
+function toE164(dial: string | undefined, phone: string): string {
+  const cc = (dial ?? "").replace(/\D/g, "");
+  const local = phoneDigits(phone).replace(/^0+/, "");
+  return `+${cc}${local}`;
+}
+
+/** Rangée d'une liste de choix (pays / opérateur), pastille de sélection. */
 function ChoiceRow({
   title,
   meta,
@@ -128,7 +71,7 @@ function ChoiceRow({
       aria-pressed={selected}
       className={cn(
         "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors",
-        "focus-visible:outline-primary focus-visible:outline-2 focus-visible:-outline-offset-2",
+        "focus-visible:ring-primary/60 focus-visible:ring-2 focus-visible:outline-none",
         selected ? "bg-primary-surface" : "hover:bg-surface-2",
       )}
     >
@@ -144,7 +87,7 @@ function ChoiceRow({
         aria-hidden="true"
         className={cn(
           "flex size-[20px] shrink-0 items-center justify-center rounded-full",
-          selected ? "bg-primary" : "border-text-muted border-2",
+          selected ? "bg-primary" : "border-border-strong border-2",
         )}
       >
         {selected && <Check size={11} strokeWidth={3} className="text-white" />}
@@ -153,61 +96,165 @@ function ChoiceRow({
   );
 }
 
+function FlowCta({
+  label,
+  disabled,
+  loading,
+  onClick,
+}: {
+  label: string;
+  disabled: boolean;
+  loading?: boolean;
+  onClick: () => void;
+}) {
+  if (disabled) {
+    return (
+      <button
+        type="button"
+        disabled
+        className="border-border bg-surface-2 text-text-muted inline-flex h-[50px] w-full cursor-not-allowed items-center justify-center rounded-md border text-[15px] font-semibold lg:max-w-[320px]"
+      >
+        {label}
+      </button>
+    );
+  }
+  return (
+    <Button onClick={onClick} className="lg:max-w-[320px]">
+      {loading ? "Envoi…" : label}
+    </Button>
+  );
+}
+
 /**
- * Écran 04 · Dépôt Mobile Money — assistant en 4 étapes.
- *
- * ÉTAPE 11 (composition) :
- * - les 6 pays cessent d'être 6 cartes flottantes : une seule surface, six
- *   rangées, un filet entre elles ; et chaque rangée porte enfin l'indicatif
- *   et les opérateurs du pays ;
- * - l'étape 2 ne propose plus que les opérateurs du pays choisi — les frais
- *   Mobile Money dépendent du couple pays/opérateur, les annoncer avant lui
- *   était la « plausibilité » que l'audit condamnait ;
- * - `TransactionFacts` n'affirme donc plus rien avant l'étape 3 : jusque-là
- *   une phrase dit à quelle condition ces chiffres s'afficheront ;
- * - un CTA existe à CHAQUE étape (le mobile n'en portait aucun aux étapes 1
- *   et 2 : l'écran paraissait fini alors qu'il attendait une sélection) ;
- * - la sélection ne saute plus d'elle-même à l'étape suivante : c'est le CTA
- *   qui avance, et le récapitulatif qui permet de revenir en arrière ;
- * - desktop : deux colonnes (saisie / vérité de l'opération) au lieu d'une
- *   colonne de 620px dans un canevas vide à 51 %.
+ * Panneau de suivi après initiation : tant que le dépôt n'est pas final, le
+ * front POLL GET /api/deposits/{uuid}. Si un `checkout_url` est fourni, il faut
+ * poursuivre le paiement sur cette page ; sinon l'opérateur pousse une demande
+ * de validation sur le téléphone. À la confirmation → écran de succès.
  */
-export default function WalletDepositPage() {
+function DepositStatusView({
+  uuid,
+  onReset,
+}: {
+  uuid: string;
+  onReset: () => void;
+}) {
   const router = useRouter();
+  const depositQuery = useDeposit(uuid);
+  const deposit = depositQuery.data;
+
+  useEffect(() => {
+    if (deposit && deposit.status === "success") {
+      router.replace(`/wallet/deposit/success?uuid=${deposit.uuid}`);
+    }
+  }, [deposit, router]);
+
+  const failed =
+    deposit && isDepositFinal(deposit.status) && deposit.status !== "success";
+
+  return (
+    <main className={FLOW_MAIN}>
+      <PageHeader title="Dépôt Mobile Money" backHref="/wallet" />
+
+      <div className="mt-10 flex flex-col items-center text-center lg:mt-16">
+        {depositQuery.isError ? (
+          <div className="w-full max-w-[420px]">
+            <InlineError error={depositQuery.error} />
+          </div>
+        ) : failed ? (
+          <>
+            <p className="text-text text-[16px] leading-[22px] font-semibold">
+              Dépôt non abouti
+            </p>
+            <p className="text-text-muted mt-2 max-w-[360px] text-[13px] leading-[19px]">
+              {deposit?.failure_reason ??
+                "L'opération a été refusée par l'opérateur."}
+            </p>
+          </>
+        ) : deposit?.checkout_url && !isDepositFinal(deposit.status) ? (
+          <>
+            <p className="text-text text-[16px] leading-[22px] font-semibold">
+              Poursuivez le paiement
+            </p>
+            <p className="text-text-muted mt-2 max-w-[360px] text-[13px] leading-[19px]">
+              Finalisez le dépôt sur la page sécurisée de l&apos;opérateur.
+            </p>
+            <a
+              href={deposit.checkout_url}
+              className="bg-primary focus-visible:ring-primary/60 mt-6 inline-flex h-[50px] w-full max-w-[320px] items-center justify-center rounded-md text-[15px] font-semibold text-white transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:outline-none"
+            >
+              Ouvrir le paiement
+            </a>
+          </>
+        ) : (
+          <>
+            <Loader2
+              size={32}
+              className="text-primary animate-spin"
+              aria-hidden="true"
+            />
+            <p className="text-text mt-5 text-[16px] leading-[22px] font-semibold">
+              Validez sur votre téléphone
+            </p>
+            <p className="text-text-muted mt-2 max-w-[360px] text-[13px] leading-[19px]">
+              Confirmez la demande Mobile Money reçue sur votre téléphone. Le
+              solde est crédité dès la confirmation.
+            </p>
+          </>
+        )}
+
+        {(failed || depositQuery.isError) && (
+          <button
+            type="button"
+            onClick={onReset}
+            className="text-primary-light mt-6 text-[13.5px] leading-[18px] font-medium underline-offset-4 hover:underline"
+          >
+            Nouveau dépôt
+          </button>
+        )}
+      </div>
+
+      <BottomNav />
+    </main>
+  );
+}
+
+export default function WalletDepositPage() {
   const [step, setStep] = useState(1);
   const [country, setCountry] = useState<string | null>(null);
-  const [operator, setOperator] = useState<string | null>(null);
+  const [operatorCode, setOperatorCode] = useState<string | null>(null);
   const [phone, setPhone] = useState("");
   const [amount, setAmount] = useState("");
+  const [depositUuid, setDepositUuid] = useState<string | null>(null);
+
+  const operatorsQuery = useOperators("payin");
+  const walletQuery = useWallet();
+  const createDeposit = useCreateDeposit();
+
+  const countries = useMemo(
+    () => groupOperatorsByCountry(operatorsQuery.data ?? []),
+    [operatorsQuery.data],
+  );
+
+  const currentCountry = countries.find((c) => c.code === country);
+  const availableOperators: Operator[] = currentCountry?.operators ?? [];
+  const operator = availableOperators.find((o) => o.code === operatorCode);
+  const dial = currentCountry?.dial;
 
   const credited = parseAmount(amount);
-  const countryName = countries.find((c) => c.code === country)?.name;
-  const dial = country ? COUNTRY_META[country]?.dial : undefined;
-  const availableOperators = country
-    ? (COUNTRY_META[country]?.operators ?? [])
-    : [];
-  const operatorName = operator ? OPERATOR_NAMES[operator] : undefined;
-
-  /** Le « solde après » n'apparaît qu'une fois un montant saisi. */
   const balanceAfter =
-    credited > 0 ? formatFcfa(wallet.balance + credited) : undefined;
-
-  const useRecent = () => {
-    setCountry(RECENT.country);
-    setOperator(RECENT.operator);
-    setPhone(RECENT.phone);
-    setStep(4);
-  };
+    credited > 0 && walletQuery.data
+      ? formatFcfa(majorUnits(walletQuery.data.balance) + credited)
+      : undefined;
 
   const stepValid =
     (step === 1 && country !== null) ||
-    (step === 2 && operator !== null) ||
-    (step === 3 && phoneLength(phone) >= 8) ||
-    (step === 4 && credited >= depositFacts.min);
+    (step === 2 && operatorCode !== null) ||
+    (step === 3 && phoneDigits(phone).length >= 8) ||
+    (step === 4 && credited >= MIN_AMOUNT_FCFA);
 
   const recap: Array<{ label: string; value?: string; step: number }> = [
-    { label: "Pays", value: countryName, step: 1 },
-    { label: "Opérateur", value: operatorName, step: 2 },
+    { label: "Pays", value: currentCountry?.name, step: 1 },
+    { label: "Opérateur", value: operator?.name, step: 2 },
     {
       label: "Numéro",
       value: phone ? `${dial ?? ""} ${phone}`.trim() : undefined,
@@ -220,15 +267,51 @@ export default function WalletDepositPage() {
     },
   ];
 
+  const submit = () => {
+    if (!operator) return;
+    createDeposit.mutate(
+      {
+        operator: operator.code,
+        amount_minor: xofMinor(credited),
+        currency: "XOF",
+        phone: toE164(dial, phone),
+      },
+      {
+        onSuccess: (deposit) => {
+          if (deposit.checkout_url && isDepositFinal(deposit.status)) {
+            // Already settled synchronously (rare): go straight to success.
+            if (deposit.status === "success") {
+              setDepositUuid(deposit.uuid);
+              return;
+            }
+          }
+          setDepositUuid(deposit.uuid);
+        },
+      },
+    );
+  };
+
+  if (depositUuid) {
+    return (
+      <DepositStatusView
+        uuid={depositUuid}
+        onReset={() => {
+          setDepositUuid(null);
+          createDeposit.reset();
+          setStep(4);
+        }}
+      />
+    );
+  }
+
   return (
     <>
       <main className={FLOW_MAIN}>
         <PageHeader title="Dépôt Mobile Money" backHref="/wallet" />
         <p className="text-text-muted mt-2 text-[12.5px] leading-[17px]">
-          Depuis Orange Money, Wave, MTN ou Moov
+          Depuis votre compte Mobile Money vers le portefeuille FixPay
         </p>
 
-        {/* En-tête de progression : l'étape est écrite, la barre l'illustre. */}
         <div className="mt-8">
           <p className="text-text-secondary text-[12px] leading-[16px]">
             Étape {step} sur 4 · {STEP_LABELS[step - 1]}
@@ -242,51 +325,64 @@ export default function WalletDepositPage() {
           {/* ---- Colonne de saisie ---- */}
           <div>
             {step === 1 && (
-              <>
-                <section>
-                  <SectionLabel>Récemment utilisé</SectionLabel>
-                  <GlassCard className="mt-3 overflow-hidden">
-                    <ChoiceRow
-                      title="Côte d'Ivoire · Wave"
-                      meta={`${RECENT.dial} ${RECENT.phone} · reprendre ce compte`}
-                      selected={false}
-                      onSelect={useRecent}
-                    />
+              <section>
+                <SectionLabel>Pays du compte Mobile Money</SectionLabel>
+                {operatorsQuery.isPending ? (
+                  <GlassCard className="mt-3 divide-y divide-border overflow-hidden">
+                    {[0, 1, 2].map((i) => (
+                      <div key={i} className="animate-pulse px-4 py-3.5">
+                        <div className="bg-surface-2 h-[14px] w-2/5 rounded-xs" />
+                        <div className="bg-surface-2 mt-2 h-[11px] w-3/5 rounded-xs" />
+                      </div>
+                    ))}
                   </GlassCard>
-                </section>
-
-                <section className="mt-8">
-                  <SectionLabel>Pays du compte Mobile Money</SectionLabel>
+                ) : operatorsQuery.isError ? (
+                  <div className="mt-3">
+                    <InlineError error={operatorsQuery.error} />
+                    <button
+                      type="button"
+                      onClick={() => void operatorsQuery.refetch()}
+                      className="text-primary-light mt-3 text-[13px] font-medium underline-offset-4 hover:underline"
+                    >
+                      Réessayer
+                    </button>
+                  </div>
+                ) : countries.length === 0 ? (
+                  <p className="text-text-muted mt-3 py-4 text-[12.5px] leading-[18px]">
+                    Aucun opérateur de dépôt n&apos;est disponible.
+                  </p>
+                ) : (
                   <GlassCard className="divide-border mt-3 divide-y overflow-hidden">
                     {countries.map((c) => (
                       <ChoiceRow
                         key={c.code}
                         title={c.name}
-                        meta={`${COUNTRY_META[c.code]?.dial ?? ""} · ${(
-                          COUNTRY_META[c.code]?.operators ?? []
-                        )
-                          .map((id) => OPERATOR_NAMES[id])
+                        meta={`${c.dial ?? ""} · ${c.operators
+                          .map((o) => o.name)
                           .join(", ")}`}
                         selected={country === c.code}
-                        onSelect={() => setCountry(c.code)}
+                        onSelect={() => {
+                          setCountry(c.code);
+                          setOperatorCode(null);
+                        }}
                       />
                     ))}
                   </GlassCard>
-                </section>
-              </>
+                )}
+              </section>
             )}
 
             {step === 2 && (
               <section>
-                <SectionLabel>{`Opérateur à débiter · ${countryName ?? ""}`}</SectionLabel>
+                <SectionLabel>{`Opérateur à débiter · ${currentCountry?.name ?? ""}`}</SectionLabel>
                 <GlassCard className="divide-border mt-3 divide-y overflow-hidden">
-                  {availableOperators.map((id) => (
+                  {availableOperators.map((o) => (
                     <ChoiceRow
-                      key={id}
-                      title={OPERATOR_NAMES[id] ?? id}
-                      meta={`Compte ${dial ?? ""} · dépôt crédité sous 2 min`}
-                      selected={operator === id}
-                      onSelect={() => setOperator(id)}
+                      key={o.code}
+                      title={o.name}
+                      meta={`Compte ${dial ?? ""}`}
+                      selected={operatorCode === o.code}
+                      onSelect={() => setOperatorCode(o.code)}
                     />
                   ))}
                 </GlassCard>
@@ -306,7 +402,7 @@ export default function WalletDepositPage() {
                   />
                 </div>
                 <p className="text-text-secondary mt-2 text-[11.5px] leading-[16px]">
-                  Compte {operatorName ?? "Mobile Money"} à débiter, indicatif{" "}
+                  Compte {operator?.name ?? "Mobile Money"} à débiter, indicatif{" "}
                   {dial ?? ""}.
                 </p>
               </section>
@@ -324,13 +420,16 @@ export default function WalletDepositPage() {
                   />
                 </div>
                 <p className="text-text-secondary mt-2 text-[11.5px] leading-[16px]">
-                  Minimum {formatFcfa(depositFacts.min)}
+                  Minimum {formatFcfa(MIN_AMOUNT_FCFA)}
                 </p>
+                {createDeposit.isError && (
+                  <InlineError error={createDeposit.error} className="mt-3" />
+                )}
               </section>
             )}
           </div>
 
-          {/* ---- Colonne de vérité : les choix faits, puis ce que ça coûte ---- */}
+          {/* ---- Colonne de vérité ---- */}
           <aside className={FLOW_ASIDE}>
             {step > 1 && (
               <section>
@@ -346,9 +445,6 @@ export default function WalletDepositPage() {
                       </dt>
                       <dd className="min-w-0 text-right">
                         {row.value ? (
-                          /* Le récapitulatif EST la navigation arrière : la
-                             barre de progression n'en offrait aucune et le
-                             bouton retour quittait le parcours entier. */
                           <button
                             type="button"
                             onClick={() => setStep(row.step)}
@@ -365,39 +461,22 @@ export default function WalletDepositPage() {
                     </div>
                   ))}
                 </dl>
+                {balanceAfter && (
+                  <div className="border-border mt-3.5 flex items-baseline justify-between border-t pt-3.5">
+                    <span className="text-text-secondary text-[12.5px] leading-[16px]">
+                      Solde après
+                    </span>
+                    <span className="text-text text-[13.5px] leading-[18px] font-medium">
+                      {balanceAfter}
+                    </span>
+                  </div>
+                )}
               </section>
             )}
-
-            <section className={step > 1 ? "mt-8" : undefined}>
-              {step >= 3 && operatorName ? (
-                <>
-                  <SectionLabel>{`Frais et délai · ${operatorName}`}</SectionLabel>
-                  <div className="mt-3">
-                    <TransactionFacts
-                      fee={depositFacts.feeLabel}
-                      delay={depositFacts.delay}
-                      limit={
-                        depositFacts.remainingLimit
-                          ? formatFcfa(depositFacts.remainingLimit)
-                          : undefined
-                      }
-                      balanceAfter={balanceAfter}
-                    />
-                  </div>
-                </>
-              ) : (
-                <p className="text-text-muted text-[12px] leading-[17px]">
-                  Les frais et le délai dépendent du pays et de l&apos;opérateur
-                  : ils s&apos;affichent dès que l&apos;opérateur est choisi.
-                </p>
-              )}
-            </section>
           </aside>
         </div>
 
         <StickyActionBar>
-          {/* Le rythme de tête (marge, filet, padding) appartient désormais à
-              la barre elle-même — voir `StickyActionBar`. */}
           <div>
             {step < 4 ? (
               <FlowCta
@@ -408,8 +487,9 @@ export default function WalletDepositPage() {
             ) : (
               <FlowCta
                 label="Confirmer le dépôt"
-                disabled={!stepValid}
-                onClick={() => router.push("/wallet/deposit/success")}
+                disabled={!stepValid || createDeposit.isPending}
+                loading={createDeposit.isPending}
+                onClick={submit}
               />
             )}
           </div>
@@ -418,38 +498,5 @@ export default function WalletDepositPage() {
 
       <BottomNav />
     </>
-  );
-}
-
-/**
- * CTA de flux, avec son état inactif. Reprend à l'identique le bouton
- * désactivé de l'écran 13 (surface neutre, libellé muted) plutôt qu'une
- * opacité posée sur l'aplat bleu, qui descend le libellé blanc sous tout seuil
- * de contraste.
- */
-function FlowCta({
-  label,
-  disabled,
-  onClick,
-}: {
-  label: string;
-  disabled: boolean;
-  onClick: () => void;
-}) {
-  if (disabled) {
-    return (
-      <button
-        type="button"
-        disabled
-        className="border-border bg-surface-2 text-text-muted inline-flex h-[50px] w-full cursor-not-allowed items-center justify-center rounded-md border text-[15px] font-semibold lg:max-w-[320px]"
-      >
-        {label}
-      </button>
-    );
-  }
-  return (
-    <Button onClick={onClick} className="lg:max-w-[320px]">
-      {label}
-    </Button>
   );
 }

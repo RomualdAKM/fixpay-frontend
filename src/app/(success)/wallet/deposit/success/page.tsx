@@ -1,61 +1,108 @@
-import { ArrowDownLeft } from "lucide-react";
+"use client";
 
+import { ArrowDownLeft, Loader2 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+
+import Link from "next/link";
+
+import { InlineError } from "@/components/feedback/InlineError";
 import type { ReceiptRow } from "@/components/ui/SuccessScreen";
 import { SuccessScreen } from "@/components/ui/SuccessScreen";
-import { formatAmount, formatFcfa } from "@/lib/format";
-import { depositFacts, wallet } from "@/lib/mock-data";
-
-export const metadata = { title: "Succès Dépôt" };
-
-/**
- * Écran 21 · Succès Dépôt.
- *
- * L'écran porte un RÉCAPITULATIF d'opération au lieu de ~420px de vide, et
- * l'icône est la flèche entrante des mouvements créditeurs (`txIconMap.deposit`),
- * pas le nuage CloudUpload d'un stockage de fichiers.
- *
- * Corrections de la re-notation :
- * - le sous-titre « Votre portefeuille FixPay a été approvisionné » disparaît :
- *   il redisait la ligne « Destination » du reçu 80px plus bas ;
- * - « Délai de crédit : sous 2 min » disparaît aussi — le solde d'arrivée est
- *   affiché juste en dessous, annoncer un délai à côté serait se contredire ;
- * - le masquage du numéro suit enfin le découpage sénégalais 77 XXX XX XX, en
- *   masquant des groupes entiers ;
- * - l'écran propose une seconde sortie (« Nouveau dépôt »), en lien texte.
- *
- * Étape 11 · composition : le desktop passe sur la grille à deux colonnes
- * commune aux six confirmations (voir SuccessScreen), et le montant porte le
- * SIGNE de l'opération. Un dépôt et un retrait signaient jusqu'ici du même
- * badge vert, la nature du mouvement ne tenant plus qu'à l'orientation d'un
- * glyphe de 22px ; « + 50 000 » la porte à la taille du montant.
- */
-const AMOUNT = 50_000;
+import { useDeposit } from "@/lib/api/moneyHooks";
+import { isDepositFinal } from "@/lib/api/status";
+import { formatAmount, formatDate, formatFcfa } from "@/lib/format";
+import { formatMoney, majorUnits } from "@/lib/money";
 
 /**
- * Solde d'arrivée DÉRIVÉ, jamais recopié. `wallet.balance` est le solde
- * COURANT du portefeuille ; ce dépôt du 14 avr. 16:20 est le dernier mouvement
- * de la série de démonstration, son solde d'arrivée EST donc le solde courant.
- * Les écrans 22, 23 et 25 lui sont antérieurs et remontent la même chaîne :
- * chacun retire de `wallet.balance` les mouvements qui l'ont suivi. Les quatre
- * confirmations n'affichent plus le même chiffre.
+ * Écran 21 · Succès Dépôt — sur les données réelles du dépôt.
+ *
+ * L'écran relit GET /api/deposits/{uuid} (uuid passé par le flux) et compose le
+ * reçu à partir du VRAI montant crédité, du montant réellement débité du compte
+ * Mobile Money et de la référence de l'opération. Plus aucune valeur en dur.
  */
-const WALLET_AFTER = wallet.balance;
-
-const receipt: ReceiptRow[] = [
-  ["Source", "Wave · +221 77 ••• •• 34"],
-  ["Destination", "Portefeuille FixPay"],
-  ["Frais", depositFacts.feeLabel],
-  ["Nouveau solde", formatFcfa(WALLET_AFTER)],
-  ["Référence", "FP-1404-8871"],
-  ["Date", "14 avr. 2026, 16:20"],
-];
+function operatorLabel(code: string): string {
+  const cleaned = code.replace(/_/g, " ");
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+}
 
 export default function WalletDepositSuccessPage() {
+  const uuid = useSearchParams().get("uuid");
+  const depositQuery = useDeposit(uuid);
+  const deposit = depositQuery.data;
+
+  if (uuid === null) {
+    return (
+      <SuccessScreen
+        icon={ArrowDownLeft}
+        title="Dépôt confirmé"
+        amount=""
+        currency="FCFA"
+        secondaryLabel="Nouveau dépôt"
+        secondaryHref="/wallet/deposit"
+      />
+    );
+  }
+
+  if (depositQuery.isPending) {
+    return (
+      <main className="mx-auto flex min-h-dvh w-full max-w-[430px] flex-col items-center justify-center px-6">
+        <Loader2 size={28} className="text-primary animate-spin" aria-hidden />
+      </main>
+    );
+  }
+
+  if (depositQuery.isError || !deposit) {
+    return (
+      <main className="mx-auto flex min-h-dvh w-full max-w-[430px] flex-col justify-center px-6">
+        <InlineError error={depositQuery.error} />
+      </main>
+    );
+  }
+
+  // Ne JAMAIS afficher un reçu « Dépôt confirmé » pour un dépôt non abouti :
+  // une URL partagée/rafraîchie sur un uuid en attente ou en échec doit montrer
+  // l'état réel, pas un reçu vert. Le flux normal ne redirige que sur 'success'.
+  if (deposit.status !== "success") {
+    const settledButNotSuccess = isDepositFinal(deposit.status);
+    return (
+      <main className="mx-auto flex min-h-dvh w-full max-w-[430px] flex-col items-center justify-center px-6 text-center">
+        <p className="text-text text-[16px] leading-[22px] font-semibold">
+          {settledButNotSuccess ? "Dépôt non abouti" : "Dépôt en cours"}
+        </p>
+        <p className="text-text-muted mt-2 max-w-[360px] text-[13px] leading-[19px]">
+          {settledButNotSuccess
+            ? (deposit.failure_reason ??
+              "L'opération n'a pas été finalisée. Aucun montant n'a été crédité.")
+            : "Ce dépôt n'est pas encore confirmé. Validez la demande sur votre téléphone, puis revenez."}
+        </p>
+        <Link
+          href="/wallet"
+          className="text-primary-light mt-6 text-[13.5px] leading-[18px] font-medium underline-offset-4 hover:underline"
+        >
+          Retour au portefeuille
+        </Link>
+      </main>
+    );
+  }
+
+  const receipt: ReceiptRow[] = [
+    ["Montant crédité", formatMoney(deposit.amount)],
+    ...(deposit.amount_charged_minor !== null
+      ? ([["Débité du compte", formatFcfa(deposit.amount_charged_minor)]] as ReceiptRow[])
+      : []),
+    ["Source", operatorLabel(deposit.operator)],
+    ["Destination", "Portefeuille FixPay"],
+    ...(deposit.processed_at
+      ? ([["Date", formatDate(deposit.processed_at)]] as ReceiptRow[])
+      : []),
+    ["Référence", deposit.uuid],
+  ];
+
   return (
     <SuccessScreen
       icon={ArrowDownLeft}
       title="Dépôt confirmé"
-      amount={formatAmount(AMOUNT)}
+      amount={formatAmount(majorUnits(deposit.amount))}
       sign="+"
       currency="FCFA"
       receipt={receipt}

@@ -7,7 +7,6 @@ import { ChevronLeft } from "lucide-react";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { AmountDisplay } from "@/components/ui/AmountDisplay";
 import { AmountInput } from "@/components/ui/AmountInput";
-import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { Numpad } from "@/components/ui/Numpad";
 import { QuickAmountChips } from "@/components/ui/QuickAmountChips";
@@ -101,7 +100,6 @@ export default function PaymentPage() {
    */
   const enough = value > 0 && value <= card.balance;
   const balanceAfter = enough ? formatFcfa(card.balance - value) : undefined;
-  const ready = value >= paymentFacts.min && enough;
   /* Le coût, écrit sur la ligne qui accompagne le CTA : c'est la seule chose
      que le mobile voyait disparaître sous le pavé (« on paie sans voir les
      frais »), et elle ne coûte pas une ligne de plus. */
@@ -237,7 +235,7 @@ export default function PaymentPage() {
             complet reste dans la colonne de vérité, un cran plus bas. */}
         <StickyActionBar>
           <div>
-            <div className="mb-3 flex items-baseline justify-between gap-3 lg:max-w-[320px]">
+            <div className="mb-2 flex items-baseline justify-between gap-3 lg:max-w-[320px]">
               <span className="text-text-muted text-[11.5px] leading-[15px]">
                 Débité de
               </span>
@@ -245,19 +243,18 @@ export default function PaymentPage() {
                 {card.label} · {feeNote}
               </span>
             </div>
-            {ready ? (
-              <Button href="/payment/success" className="lg:max-w-[320px]">
-                Payer maintenant
-              </Button>
-            ) : (
-              <button
-                type="button"
-                disabled
-                className="border-border bg-surface-2 text-text-muted inline-flex h-[50px] w-full cursor-not-allowed items-center justify-center rounded-md border text-[15px] font-semibold lg:max-w-[320px]"
-              >
-                Payer maintenant
-              </button>
-            )}
+            {/* Le paiement par carte n'est pas encore raccordé à l'API : le CTA
+                reste inactif plutôt que de simuler un succès sans débit. */}
+            <p className="text-text-muted mb-3 text-[11.5px] leading-[16px] lg:max-w-[320px]">
+              Le paiement par carte sera bientôt disponible.
+            </p>
+            <button
+              type="button"
+              disabled
+              className="border-border bg-surface-2 text-text-muted inline-flex h-[50px] w-full cursor-not-allowed items-center justify-center rounded-md border text-[15px] font-semibold lg:max-w-[320px]"
+            >
+              Payer maintenant
+            </button>
           </div>
         </StickyActionBar>
       </main>
