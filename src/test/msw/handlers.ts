@@ -37,6 +37,8 @@ export const testUser: User = {
   status: "active",
   pin_set: true,
   email_verified: true,
+  roles: ["user"],
+  permissions: [],
 };
 
 /** USD money helper (scale 2 — cents, two decimals) for card fixtures. */

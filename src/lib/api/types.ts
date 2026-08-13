@@ -49,6 +49,18 @@ export interface User {
   /** Whether a transactional PIN has been set (AuthController::userPayload). */
   pin_set: boolean;
   email_verified: boolean;
+  /**
+   * Role slugs (App\Domain\Authorization\Role), e.g. `["config_admin"]`. A
+   * normal app user is `["user"]`. Sourced from `userPayload.roles`.
+   */
+  roles: string[];
+  /**
+   * Effective permission slugs (App\Domain\Authorization\Permission), flattened
+   * from the user's roles, e.g. `["config.read", "config.write"]`. Empty for a
+   * plain app user. Drives every admin gate. Sourced from
+   * `userPayload.permissions`.
+   */
+  permissions: string[];
 }
 
 /** POST /api/login `data`. */

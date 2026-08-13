@@ -151,13 +151,27 @@ async function performRequest(
 }
 
 /**
- * Execute an API request and return the unwrapped `data`.
- * `T` is the shape of the envelope's `data` field for this endpoint.
+ * The unwrapped `data` plus the transport metadata a caller may need to branch
+ * on. The HTTP `status` is the honest signal that separates a write applied
+ * directly (200/201) from one parked behind maker-checker approval (202); the
+ * `message` is the backend's machine key (e.g. `pricing_rule_change_requested`).
  */
-export async function apiFetch<T>(
+export interface ApiResult<T> {
+  data: T;
+  status: number;
+  message: string | null;
+}
+
+/**
+ * Execute an API request and return the unwrapped `data` together with the HTTP
+ * `status` and envelope `message`. Callers that only need the payload use
+ * `apiFetch`; the admin write flow uses this to tell "applied" from "pending
+ * approval" (202) without a second guess.
+ */
+export async function apiFetchResult<T>(
   path: string,
   options: ApiFetchOptions = {},
-): Promise<T> {
+): Promise<ApiResult<T>> {
   const method = (options.method ?? "GET").toUpperCase();
 
   let response = await performRequest(path, method, options, true);
@@ -179,5 +193,20 @@ export async function apiFetch<T>(
     );
   }
 
-  return envelope.data as T;
+  return {
+    data: envelope.data as T,
+    status: response.status,
+    message: envelope.message,
+  };
+}
+
+/**
+ * Execute an API request and return the unwrapped `data`.
+ * `T` is the shape of the envelope's `data` field for this endpoint.
+ */
+export async function apiFetch<T>(
+  path: string,
+  options: ApiFetchOptions = {},
+): Promise<T> {
+  return (await apiFetchResult<T>(path, options)).data;
 }

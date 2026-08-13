@@ -25,6 +25,8 @@ const REAL_USER: User = {
   status: "active",
   pin_set: true,
   email_verified: true,
+  roles: ["user"],
+  permissions: [],
 };
 
 describe("Privacy — data export recipient", () => {
