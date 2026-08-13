@@ -1,0 +1,298 @@
+@import "tailwindcss";
+
+/*
+ * FixPay design tokens.
+ *
+ * Ce système a été RÉÉCRIT après l'audit docs/AUDIT_LOOK_IA.md. Le Figma
+ * d'origine (import automatique d'un HTML généré) n'est plus la référence :
+ * ses marqueurs de design génératif ont été éliminés au niveau du système —
+ * lueurs colorées, 32 rayons, dégradés partout, palette Tailwind par défaut.
+ *
+ * Architecture inchangée : `@theme inline` mappe chaque token Tailwind sur une
+ * variable CSS, les palettes sont déclarées via `[data-theme]`, et un sous-arbre
+ * `data-theme="dark"` épingle les surfaces à dégradé (voir docs/THEMING.md).
+ */
+@theme inline {
+  /* Fonts (variables exposed by next/font in layout.tsx) */
+  --font-sans:
+    var(--font-dm-sans), "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-dm-mono), "DM Mono", ui-monospace, monospace;
+
+  /* Background / structure */
+  --color-bg: var(--c-bg);
+  --color-bg-raised: var(--c-bg-raised);
+  --color-nav: var(--c-nav);
+
+  /* Text */
+  --color-text: var(--c-text);
+  --color-text-secondary: var(--c-text-secondary);
+  --color-text-muted: var(--c-text-muted);
+  --color-icon-muted: var(--c-icon-muted);
+  --color-tagline: var(--c-tagline);
+
+  /* Brand */
+  --color-primary: var(--c-primary);
+  --color-primary-light: var(--c-primary-light);
+  --color-primary-deep: var(--c-primary-deep);
+  --color-primary-mid: var(--c-primary-mid);
+  --color-primary-darkest: var(--c-primary-darkest);
+
+  /* Semantic */
+  --color-success: var(--c-success);
+  --color-success-deep: var(--c-success-deep);
+  --color-danger: var(--c-danger);
+  --color-danger-light: var(--c-danger-light);
+  --color-warning: var(--c-warning);
+  --color-warning-deep: var(--c-warning-deep);
+  --color-gold: var(--c-gold);
+  --color-orange: var(--c-orange);
+  --color-mc: var(--c-mc);
+  --color-mc-dark: var(--c-mc-dark);
+  --color-mc-light: var(--c-mc-light);
+
+  /* Surfaces */
+  --color-surface: var(--c-surface);
+  --color-surface-2: var(--c-surface-2);
+  --color-surface-3: var(--c-surface-3);
+  --color-surface-4: var(--c-surface-4);
+  --color-surface-5: var(--c-surface-5);
+  --color-border: var(--c-border);
+  --color-border-strong: var(--c-border-strong);
+  --color-border-frame: var(--c-border-frame);
+
+  /* Translucent tints */
+  --color-primary-surface: var(--c-primary-surface);
+  --color-primary-tint: var(--c-primary-tint);
+  --color-primary-tint-2: var(--c-primary-tint-2);
+  --color-primary-border: var(--c-primary-border);
+  --color-success-surface: var(--c-success-surface);
+  --color-success-tint: var(--c-success-tint);
+  --color-success-border: var(--c-success-border);
+  --color-warning-surface: var(--c-warning-surface);
+  --color-warning-tint: var(--c-warning-tint);
+  --color-warning-border: var(--c-warning-border);
+  --color-mc-tint: var(--c-mc-tint);
+
+  /*
+   * ÉCHELLE DE RAYONS — 4 valeurs, un rôle chacune (audit : le design source en
+   * comptait 32, sans hiérarchie : l'objet identitaire et un panneau neutre
+   * partageaient 22px). Tout le reste passe par `rounded-full`.
+   *   xs  micro-objets    : puce de carte, remplissage de barre
+   *   sm  petits contrôles: boutons icône, tuiles, œil, vignettes
+   *   md  interactifs     : CTA, champs, lignes de liste sélectionnables
+   *   lg  surfaces        : cartes, panneaux, heros, bandeaux
+   */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  /*
+   * OMBRES — neutres et courtes (audit : le système déclarait 8 ombres toutes
+   * colorées, dont 60px de flou sous un objet de 145px). Trois rôles :
+   *   surface  : lift discret d'une carte (nul en sombre, hairline en clair)
+   *   raised   : le seul objet réellement en relief (carte bancaire, hero)
+   *   specular : liseré haut d'une surface à dégradé, remplace les « blobs »
+   */
+  --shadow-surface: var(--s-surface);
+  --shadow-raised: var(--s-raised);
+  --shadow-specular: inset 0 1px 0 rgb(255 255 255 / 0.1);
+}
+
+/* Styling hook for the rare light-only refinement. */
+@custom-variant light (&:where([data-theme="light"] *));
+
+/* ---------------------------------------------------------------------------
+   Thème sombre. Également appliqué à tout sous-arbre `data-theme="dark"` pour
+   que les surfaces à dégradé restent sombres sous le thème clair.
+   --------------------------------------------------------------------------- */
+:root,
+[data-theme="dark"] {
+  --c-bg: #070c1a; /* fond nuit désaturé — conservé, c'est la base de marque */
+  --c-bg-raised: #0d1629;
+  --c-nav: rgb(7 12 26 / 0.97);
+
+  --c-text: #eef2ff;
+  --c-text-secondary: rgb(196 212 255 / 0.72);
+  /* Remonté de 0.38 à 0.62 : l'ancienne valeur donnait 2.4:1, sous le seuil AA. */
+  --c-text-muted: rgb(160 182 255 / 0.62);
+  --c-icon-muted: rgb(220 230 255 / 0.62);
+  --c-tagline: rgb(160 182 255 / 0.62);
+
+  /*
+   * Bleu propriétaire, légèrement violacé : l'ancien #3b82f6 était exactement
+   * blue-500 de Tailwind, reconnaissable au premier coup d'œil.
+   */
+  --c-primary: #2f5be8;
+  --c-primary-light: #7aa0ff;
+  --c-primary-deep: #1a3da8; /* inchangé : intérieur du dégradé carte */
+  --c-primary-mid: #2457c5; /* inchangé : arrêt du dégradé carte */
+  --c-primary-darkest: #0b1c6b; /* inchangé : arrêt du dégradé carte */
+
+  /* Sémantiques décalées des valeurs Tailwind par défaut. */
+  --c-success: #30a46c;
+  --c-success-deep: #26855a;
+  --c-danger: #e5484d;
+  --c-danger-light: #f2555a;
+  --c-warning: #e79d13;
+  --c-warning-deep: #c9840f;
+  --c-gold: #c9a227; /* or mat : la puce n'est plus un dégradé */
+  --c-orange: #e8792b;
+  --c-mc: #8b1a3a;
+  --c-mc-dark: #3a0a1f;
+  --c-mc-light: #b91c5a;
+
+  --c-surface: rgb(255 255 255 / 0.05);
+  --c-surface-2: rgb(255 255 255 / 0.09);
+  --c-surface-3: rgb(255 255 255 / 0.12);
+  --c-surface-4: rgb(255 255 255 / 0.14);
+  --c-surface-5: rgb(255 255 255 / 0.18);
+  --c-border: rgb(255 255 255 / 0.08);
+  --c-border-strong: rgb(255 255 255 / 0.14);
+  --c-border-frame: rgb(255 255 255 / 0.1);
+
+  --c-primary-surface: rgb(47 91 232 / 0.1);
+  --c-primary-tint: rgb(47 91 232 / 0.14);
+  --c-primary-tint-2: rgb(47 91 232 / 0.18);
+  --c-primary-border: rgb(47 91 232 / 0.32);
+  --c-success-surface: rgb(48 164 108 / 0.1);
+  --c-success-tint: rgb(48 164 108 / 0.16);
+  --c-success-border: rgb(48 164 108 / 0.28);
+  --c-warning-surface: rgb(231 157 19 / 0.1);
+  --c-warning-tint: rgb(231 157 19 / 0.16);
+  --c-warning-border: rgb(231 157 19 / 0.28);
+  --c-mc-tint: rgb(139 26 58 / 0.16);
+}
+
+/* ---------------------------------------------------------------------------
+   Thème clair — conçu, non inversé : les surfaces de verre deviennent des
+   cartes blanches sur un fond bleuté, les accents sont assombris pour tenir AA.
+   --------------------------------------------------------------------------- */
+[data-theme="light"] {
+  --c-bg: #eef1f8;
+  --c-bg-raised: #ffffff;
+  --c-nav: rgb(255 255 255 / 0.94);
+
+  --c-text: #0e1830;
+  --c-text-secondary: rgb(20 32 66 / 0.78);
+  --c-text-muted: rgb(30 45 90 / 0.72);
+  --c-icon-muted: rgb(30 45 90 / 0.66);
+  --c-tagline: rgb(20 32 66 / 0.6);
+
+  --c-primary: #2f5be8; /* 5.4:1 sur --c-bg : lisible en texte comme en fill */
+  --c-primary-light: #2f5be8;
+  --c-primary-deep: #1a3da8;
+  --c-primary-mid: #2457c5;
+  --c-primary-darkest: #0b1c6b;
+
+  --c-success: #1a7a4e; /* 4.9:1 */
+  --c-success-deep: #14603d;
+  --c-danger: #c42b30; /* 5.6:1 */
+  --c-danger-light: #b02328;
+  --c-warning: #8c5a08; /* 5.5:1 */
+  --c-warning-deep: #6f4706;
+  --c-gold: #a8871f;
+  --c-orange: #c4611f;
+  --c-mc: #8b1a3a;
+  --c-mc-dark: #3a0a1f;
+  --c-mc-light: #b91c5a;
+
+  --c-surface: #ffffff;
+  --c-surface-2: rgb(30 45 90 / 0.06);
+  --c-surface-3: rgb(30 45 90 / 0.09);
+  --c-surface-4: rgb(30 45 90 / 0.12);
+  --c-surface-5: rgb(30 45 90 / 0.15);
+  --c-border: rgb(30 45 90 / 0.1);
+  --c-border-strong: rgb(30 45 90 / 0.18);
+  --c-border-frame: rgb(30 45 90 / 0.13);
+
+  --c-primary-surface: rgb(47 91 232 / 0.06);
+  --c-primary-tint: rgb(47 91 232 / 0.09);
+  --c-primary-tint-2: rgb(47 91 232 / 0.12);
+  --c-primary-border: rgb(47 91 232 / 0.28);
+  --c-success-surface: rgb(26 122 78 / 0.07);
+  --c-success-tint: rgb(26 122 78 / 0.1);
+  --c-success-border: rgb(26 122 78 / 0.24);
+  --c-warning-surface: rgb(140 90 8 / 0.07);
+  --c-warning-tint: rgb(140 90 8 / 0.1);
+  --c-warning-border: rgb(140 90 8 / 0.24);
+  --c-mc-tint: rgb(139 26 58 / 0.09);
+}
+
+/*
+ * Les ombres sont déclarées sur la RACINE uniquement, jamais dans le bloc
+ * épinglé : un hero épinglé sombre repose sur une page claire, son ombre doit
+ * suivre le thème de l'application (voir docs/THEMING.md).
+ */
+:root {
+  color-scheme: dark;
+  --s-surface: 0 0 #0000; /* aucune ombre sur fond sombre */
+  --s-raised: 0 8px 24px rgb(0 0 0 / 0.4);
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+  --s-surface: 0 1px 2px rgb(15 23 42 / 0.06);
+  --s-raised: 0 8px 24px rgb(15 23 42 / 0.12);
+}
+
+/* ---------- Dégradés : réservés à l'objet identitaire ---------- */
+@utility gradient-card {
+  /* La carte bancaire et le hero portefeuille — et rien d'autre. */
+  background-image: linear-gradient(
+    135deg,
+    #0b1c6b 0%,
+    #1a3da8 55%,
+    #2457c5 100%
+  );
+}
+@utility gradient-card-mc {
+  /* Variante Mastercard de la carte. */
+  background-image: linear-gradient(
+    135deg,
+    #3a0a1f 0%,
+    #8b1a3a 50%,
+    #b91c5a 100%
+  );
+}
+
+/* ---------- Base ---------- */
+body {
+  background-color: var(--c-bg);
+  color: var(--c-text);
+  font-family: var(--font-sans);
+  /*
+   * Chiffres tabulaires dans toute l'application : sans cela les colonnes de
+   * montants ne s'alignent pas et le montant saisi au pavé numérique se
+   * déplace à chaque frappe. Non négociable dans un produit financier.
+   */
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ---------------------------------------------------------------------------
+   GOUTTIÈRE DE LISTE
+
+   La suppression des tuiles d'icône systématiques était juste, mais elle a
+   laissé le bord gauche des listes irrégulier : sur l'Accueil trois rangées
+   commençaient à 24px et la quatrième, seule à porter une pastille, à 64px.
+   La règle du produit : dès qu'UNE rangée d'une liste porte un visuel de tête,
+   toutes RÉSERVENT la gouttière — on ne rajoute pas la tuile supprimée, on
+   garde la place vide.
+
+   La détection se fait au niveau du conteneur, en `:has()` sur ses rangées
+   directes : aucune page n'a à compter ses lignes ni à passer de prop. Les
+   rangées lisent `--list-gutter-on` (0 ou 1) et le multiplient par la largeur
+   exacte du visuel voisin (voir ListItem / TransactionItem).
+
+   La première règle est le garde-fou : un conteneur de rangées SANS visuel
+   remet le drapeau à 0 pour ne pas hériter de celui d'une liste englobante.
+   La seconde, plus spécifique, l'emporte sur le conteneur concerné.
+   --------------------------------------------------------------------------- */
+*:has(> [data-list-row]) {
+  --list-gutter-on: 0;
+}
+*:has(> [data-list-row][data-list-leading]) {
+  --list-gutter-on: 1;
+}
