@@ -3,8 +3,10 @@ import { z } from "zod";
 import type {
   CreateFxRateInput,
   CreateLimitInput,
+  CreateMerchantInput,
   CreatePricingRuleInput,
   CreateProviderCostInput,
+  CreditWalletInput,
   CurateBinInput,
   CurateOperatorInput,
   UpdateLimitInput,
@@ -268,4 +270,43 @@ export type OperatorCurateForm = z.infer<typeof operatorCurateSchema>;
 
 export function toCurateOperator(f: OperatorCurateForm): CurateOperatorInput {
   return { fixpay_enabled: f.fixpay_enabled };
+}
+
+// ---- B2B merchant creation ---------------------------------------------
+
+export const merchantCreateSchema = z.object({
+  name: z.string().min(1, REQUIRED).max(255),
+  contact_email: z.string().min(1, REQUIRED).email("E-mail invalide."),
+  webhook_url: z.string(),
+  default_bin_uuid: z.string(),
+  can_reveal_pan: z.boolean(),
+});
+export type MerchantCreateForm = z.infer<typeof merchantCreateSchema>;
+
+export function toCreateMerchant(f: MerchantCreateForm): CreateMerchantInput {
+  return {
+    name: f.name,
+    contact_email: f.contact_email,
+    can_reveal_pan: f.can_reveal_pan,
+    webhook_url: str(f.webhook_url),
+    default_bin_uuid: str(f.default_bin_uuid),
+  };
+}
+
+// ---- Merchant wallet credit (maker-checker) ----------------------------
+
+export const creditWalletSchema = z.object({
+  amount_minor: numberField(true),
+  source: z.string().min(1, REQUIRED).max(255),
+  reference: z.string().min(1, REQUIRED).max(255),
+});
+export type CreditWalletForm = z.infer<typeof creditWalletSchema>;
+
+export function toCreditWallet(f: CreditWalletForm): CreditWalletInput {
+  return {
+    amount_minor: Number(f.amount_minor),
+    currency: "XOF",
+    source: f.source,
+    reference: f.reference,
+  };
 }

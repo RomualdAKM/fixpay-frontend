@@ -19,17 +19,35 @@ import type {
   AdminOperator,
   AdminOverview,
   ApprovalRequest,
+  AuditFilters,
+  AuditLog,
+  AuditVerifyResult,
+  B2bApiKey,
+  B2bMerchant,
   Bin,
   CreateFxRateInput,
   CreateLimitInput,
+  CreateMerchantInput,
   CreatePricingRuleInput,
   CreateProviderCostInput,
+  CreditWalletInput,
   CurateBinInput,
   CurateOperatorInput,
+  FloatSnapshot,
   FxRate,
+  IssuedApiKey,
+  KycQueueItem,
+  KycReviewDetail,
+  LedgerAccount,
+  LedgerAccountFilters,
+  LedgerTransaction,
+  LedgerTransactionFilters,
   Limit,
   PricingRule,
   ProviderCost,
+  ReconciliationRun,
+  SchedulerTask,
+  SchedulerTick,
   UpdateAdminConfigInput,
   UpdateLimitInput,
   UpdatePricingRuleInput,
@@ -306,4 +324,200 @@ export function useRejectTopup() {
     ({ uuid, reason }) => admin.rejectTopupApproval(uuid, reason),
     adminKeys.approvalsTopups,
   );
+}
+
+// ---- KYC review --------------------------------------------------------
+
+export function useKycQueue(
+  page: number,
+): UseQueryResult<AdminList<KycQueueItem>, ApiError> {
+  return useQuery<AdminList<KycQueueItem>, ApiError>({
+    queryKey: adminKeys.kycQueue(page),
+    queryFn: () => admin.fetchKycQueue(page),
+  });
+}
+
+export function useKycDetail(
+  uuid: string | null,
+): UseQueryResult<KycReviewDetail, ApiError> {
+  return useQuery<KycReviewDetail, ApiError>({
+    queryKey: adminKeys.kycDetail(uuid ?? "none"),
+    queryFn: () => admin.fetchKycDetail(uuid as string),
+    enabled: uuid !== null,
+  });
+}
+
+/** Invalidate both the open dossier and every queue page after a decision. */
+function useKycDecision(
+  mutationFn: (uuid: string) => Promise<KycReviewDetail>,
+): UseMutationResult<KycReviewDetail, ApiError, { uuid: string }> {
+  const queryClient = useQueryClient();
+  return useMutation<KycReviewDetail, ApiError, { uuid: string }>({
+    mutationFn: ({ uuid }) => mutationFn(uuid),
+    onSuccess: (detail) => {
+      void queryClient.invalidateQueries({
+        queryKey: adminKeys.kycDetail(detail.uuid),
+      });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "kyc", "queue"] });
+    },
+  });
+}
+
+export function useApproveKyc() {
+  return useKycDecision((uuid) => admin.approveKyc(uuid));
+}
+
+export function useRejectKyc(): UseMutationResult<
+  KycReviewDetail,
+  ApiError,
+  { uuid: string; reason: string }
+> {
+  const queryClient = useQueryClient();
+  return useMutation<KycReviewDetail, ApiError, { uuid: string; reason: string }>({
+    mutationFn: ({ uuid, reason }) => admin.rejectKyc(uuid, reason),
+    onSuccess: (detail) => {
+      void queryClient.invalidateQueries({
+        queryKey: adminKeys.kycDetail(detail.uuid),
+      });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "kyc", "queue"] });
+    },
+  });
+}
+
+// ---- B2B merchants -----------------------------------------------------
+
+export function useMerchants(): UseQueryResult<
+  AdminList<B2bMerchant>,
+  ApiError
+> {
+  return useQuery<AdminList<B2bMerchant>, ApiError>({
+    queryKey: adminKeys.merchants,
+    queryFn: () => admin.fetchMerchants(),
+  });
+}
+
+export function useCreateMerchant() {
+  return useWriteMutation<CreateMerchantInput, B2bMerchant>(
+    (input) => admin.createMerchant(input),
+    adminKeys.merchants,
+  );
+}
+
+export function useIssueMerchantKey(): UseMutationResult<
+  IssuedApiKey,
+  ApiError,
+  { uuid: string }
+> {
+  return useMutation<IssuedApiKey, ApiError, { uuid: string }>({
+    mutationFn: ({ uuid }) => admin.issueMerchantKey(uuid),
+  });
+}
+
+export function useRevokeMerchantKey(): UseMutationResult<
+  B2bApiKey,
+  ApiError,
+  { uuid: string; keyUuid: string }
+> {
+  return useMutation<B2bApiKey, ApiError, { uuid: string; keyUuid: string }>({
+    mutationFn: ({ uuid, keyUuid }) => admin.revokeMerchantKey(uuid, keyUuid),
+  });
+}
+
+export function useCreditMerchantWallet(): UseMutationResult<
+  WriteOutcome<B2bMerchant>,
+  ApiError,
+  { uuid: string; input: CreditWalletInput }
+> {
+  return useMutation<
+    WriteOutcome<B2bMerchant>,
+    ApiError,
+    { uuid: string; input: CreditWalletInput }
+  >({
+    mutationFn: ({ uuid, input }) => admin.creditMerchantWallet(uuid, input),
+  });
+}
+
+// ---- Ledger (read-only) ------------------------------------------------
+
+export function useLedgerAccounts(
+  filters: LedgerAccountFilters,
+): UseQueryResult<AdminList<LedgerAccount>, ApiError> {
+  return useQuery<AdminList<LedgerAccount>, ApiError>({
+    queryKey: adminKeys.ledgerAccounts(filters),
+    queryFn: () => admin.fetchLedgerAccounts(filters),
+  });
+}
+
+export function useLedgerTransactions(
+  filters: LedgerTransactionFilters,
+): UseQueryResult<AdminList<LedgerTransaction>, ApiError> {
+  return useQuery<AdminList<LedgerTransaction>, ApiError>({
+    queryKey: adminKeys.ledgerTransactions(filters),
+    queryFn: () => admin.fetchLedgerTransactions(filters),
+  });
+}
+
+export function useLedgerTransaction(
+  uuid: string | null,
+): UseQueryResult<LedgerTransaction, ApiError> {
+  return useQuery<LedgerTransaction, ApiError>({
+    queryKey: adminKeys.ledgerTransaction(uuid ?? "none"),
+    queryFn: () => admin.fetchLedgerTransaction(uuid as string),
+    enabled: uuid !== null,
+  });
+}
+
+// ---- Reconciliation ----------------------------------------------------
+
+export function useFloats(
+  page: number,
+): UseQueryResult<AdminList<FloatSnapshot>, ApiError> {
+  return useQuery<AdminList<FloatSnapshot>, ApiError>({
+    queryKey: adminKeys.reconFloats(page),
+    queryFn: () => admin.fetchFloats(page),
+  });
+}
+
+export function useReconciliationRuns(
+  page: number,
+): UseQueryResult<AdminList<ReconciliationRun>, ApiError> {
+  return useQuery<AdminList<ReconciliationRun>, ApiError>({
+    queryKey: adminKeys.reconRuns(page),
+    queryFn: () => admin.fetchReconciliationRuns(page),
+  });
+}
+
+export function useTicks(): UseQueryResult<AdminList<SchedulerTick>, ApiError> {
+  return useQuery<AdminList<SchedulerTick>, ApiError>({
+    queryKey: adminKeys.reconTicks,
+    queryFn: () => admin.fetchTicks(),
+  });
+}
+
+export function useTasks(): UseQueryResult<AdminList<SchedulerTask>, ApiError> {
+  return useQuery<AdminList<SchedulerTask>, ApiError>({
+    queryKey: adminKeys.reconTasks,
+    queryFn: () => admin.fetchTasks(),
+  });
+}
+
+// ---- Audit -------------------------------------------------------------
+
+export function useAudit(
+  filters: AuditFilters,
+): UseQueryResult<AdminList<AuditLog>, ApiError> {
+  return useQuery<AdminList<AuditLog>, ApiError>({
+    queryKey: adminKeys.audit(filters),
+    queryFn: () => admin.fetchAudit(filters),
+  });
+}
+
+export function useVerifyAudit(): UseMutationResult<
+  AuditVerifyResult,
+  ApiError,
+  void
+> {
+  return useMutation<AuditVerifyResult, ApiError, void>({
+    mutationFn: () => admin.verifyAudit(),
+  });
 }

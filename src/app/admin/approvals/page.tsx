@@ -27,6 +27,7 @@ import {
 } from "@/lib/admin/hooks";
 import { hasPermission, Permission } from "@/lib/admin/permissions";
 import type { AdminList, ApprovalRequest } from "@/lib/admin/types";
+import { formatDate } from "@/lib/format";
 
 interface DecisionVars {
   uuid: string;
@@ -37,6 +38,58 @@ type DecisionMutation = UseMutationResult<ApprovalRequest, ApiError, DecisionVar
 
 const SELF_APPROVAL_EXPLANATION =
   "Vous êtes le demandeur de cette modification. Par séparation des tâches, un autre validateur doit l'approuver.";
+
+/** Render a proposed value: primitives as-is, anything richer as compact JSON. */
+function formatProposedValue(value: unknown): string {
+  if (value === null || value === undefined) return "—";
+  if (typeof value === "string") return value === "" ? "—" : value;
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  return JSON.stringify(value);
+}
+
+/**
+ * The diff to examine before deciding. Secret fields arrive already masked from
+ * the backend (`••••••`) — the front NEVER unmasks them and never fetches a
+ * clear value. An empty payload is stated honestly rather than left blank.
+ */
+function ProposedValues({ values }: { values: Record<string, unknown> }) {
+  const entries = Object.entries(values ?? {});
+  if (entries.length === 0) {
+    return (
+      <span className="text-text-muted text-[12px]">
+        Aucune valeur détaillée.
+      </span>
+    );
+  }
+  return (
+    <dl className="grid max-w-[360px] grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+      {entries.map(([key, value]) => (
+        <div key={key} className="contents">
+          <dt className="text-text-muted text-[12px] font-medium break-all">
+            {key}
+          </dt>
+          <dd className="text-text font-mono text-[12px] break-all">
+            {formatProposedValue(value)}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/** The maker's display name (falls back to a numeric id, then a dash). */
+function requesterLabel(approval: ApprovalRequest): string {
+  const requester = approval.requested_by;
+  if (requester && typeof requester === "object") {
+    if (requester.name) return requester.name;
+    if (requester.id !== null && requester.id !== undefined) {
+      return `#${requester.id}`;
+    }
+  }
+  return "—";
+}
 
 function ApprovalSection({
   title,
@@ -121,7 +174,7 @@ function ApprovalSection({
               <thead>
                 <tr className="border-border text-text-muted border-b text-[12px]">
                   <th className="px-4 py-3 font-medium">Opération</th>
-                  <th className="px-4 py-3 font-medium">Cible</th>
+                  <th className="px-4 py-3 font-medium">Valeurs proposées</th>
                   <th className="px-4 py-3 font-medium">Demandé par</th>
                   <th className="px-4 py-3 font-medium">Statut</th>
                   <th className="px-4 py-3 font-medium">
@@ -131,7 +184,12 @@ function ApprovalSection({
               </thead>
               <tbody>
                 {rows.map((approval) => {
-                  const blocked = selfBlocked.has(approval.uuid);
+                  // Pre-disabled on the backend's own `is_own_request` verdict,
+                  // AND on a reactive self-approval refusal caught from a stale
+                  // list — a maker can never decide their own request.
+                  const blocked =
+                    approval.is_own_request === true ||
+                    selfBlocked.has(approval.uuid);
                   const busy = approve.isPending || reject.isPending;
                   return (
                     <tr
@@ -142,6 +200,11 @@ function ApprovalSection({
                         <span className="font-medium">
                           {approval.operation ?? "—"}
                         </span>
+                        {approval.target_uuid ? (
+                          <span className="text-text-muted mt-0.5 block font-mono text-[11px] break-all">
+                            cible : {approval.target_uuid}
+                          </span>
+                        ) : null}
                         {rowError?.uuid === approval.uuid ? (
                           <span
                             role="alert"
@@ -151,15 +214,16 @@ function ApprovalSection({
                           </span>
                         ) : null}
                       </td>
-                      <td className="text-text-secondary px-4 py-3">
-                        <span className="font-mono text-[12px] break-all">
-                          {approval.target_uuid ?? "—"}
-                        </span>
+                      <td className="px-4 py-3">
+                        <ProposedValues values={approval.proposed_values} />
                       </td>
-                      <td className="text-text-secondary px-4 py-3 tabular-nums">
-                        {approval.requested_by === null
-                          ? "—"
-                          : `#${approval.requested_by}`}
+                      <td className="text-text-secondary px-4 py-3">
+                        <span className="block">{requesterLabel(approval)}</span>
+                        {approval.created_at ? (
+                          <span className="text-text-muted mt-0.5 block text-[12px]">
+                            {formatDate(approval.created_at)}
+                          </span>
+                        ) : null}
                       </td>
                       <td className="px-4 py-3">
                         <StatusPill tone="warning">En attente</StatusPill>
@@ -187,6 +251,11 @@ function ApprovalSection({
                         >
                           Rejeter
                         </button>
+                        {approval.is_own_request === true ? (
+                          <p className="text-text-muted mt-1 max-w-[220px] text-[11px] leading-[15px] whitespace-normal">
+                            {SELF_APPROVAL_EXPLANATION}
+                          </p>
+                        ) : null}
                       </td>
                     </tr>
                   );

@@ -4,13 +4,18 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BadgeDollarSign,
+  BookOpenCheck,
   CreditCard,
   Gauge,
   Landmark,
   Radio,
+  Scale,
+  ScrollText,
   ShieldCheck,
   SlidersHorizontal,
+  Store,
   Tags,
+  UserCheck,
   type LucideIcon,
 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -98,6 +103,41 @@ const NAV: NavGroup[] = [
         href: "/admin/config/settings",
         icon: SlidersHorizontal,
         permissions: [Permission.ConfigRead],
+      },
+    ],
+  },
+  {
+    label: "Opérations",
+    entries: [
+      {
+        label: "Revue KYC",
+        href: "/admin/kyc",
+        icon: UserCheck,
+        permissions: [Permission.KycReview],
+      },
+      {
+        label: "Marchands B2B",
+        href: "/admin/merchants",
+        icon: Store,
+        permissions: [Permission.MerchantManage, Permission.MerchantCredit],
+      },
+      {
+        label: "Grand livre",
+        href: "/admin/ledger",
+        icon: BookOpenCheck,
+        permissions: [Permission.LedgerRead],
+      },
+      {
+        label: "Réconciliation",
+        href: "/admin/reconciliation",
+        icon: Scale,
+        permissions: [Permission.LedgerRead],
+      },
+      {
+        label: "Journal d'audit",
+        href: "/admin/audit",
+        icon: ScrollText,
+        permissions: [Permission.AuditRead],
       },
     ],
   },

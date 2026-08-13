@@ -118,3 +118,43 @@ export function AdminEmpty({ children }: { children: ReactNode }) {
     </div>
   );
 }
+
+/** Previous/next pager driven by the backend paginator meta. */
+export function AdminPager({
+  page,
+  lastPage,
+  total,
+  onPage,
+}: {
+  page: number;
+  lastPage: number;
+  total: number;
+  onPage: (next: number) => void;
+}) {
+  if (lastPage <= 1) return null;
+  return (
+    <div className="border-border flex items-center justify-between gap-3 border-t px-4 py-3">
+      <span className="text-text-muted text-[12px]">
+        Page {page} / {lastPage} · {total} au total
+      </span>
+      <span className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onPage(page - 1)}
+          disabled={page <= 1}
+          className="border-border bg-surface text-text hover:bg-surface-2 focus-visible:ring-primary/60 rounded-md border px-3 py-1.5 text-[13px] font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:opacity-40"
+        >
+          Précédent
+        </button>
+        <button
+          type="button"
+          onClick={() => onPage(page + 1)}
+          disabled={page >= lastPage}
+          className="border-border bg-surface text-text hover:bg-surface-2 focus-visible:ring-primary/60 rounded-md border px-3 py-1.5 text-[13px] font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:opacity-40"
+        >
+          Suivant
+        </button>
+      </span>
+    </div>
+  );
+}

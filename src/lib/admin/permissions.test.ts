@@ -43,4 +43,12 @@ describe("admin permissions helper", () => {
     expect(hasAnyAdminPermission(userWith(["config.read"]))).toBe(true);
     expect(hasAnyAdminPermission(userWith(["kyc.review"]))).toBe(true);
   });
+
+  it("does NOT admit a permission no admin screen consumes yet", () => {
+    // Mirrors the documented card.reveal_pan exclusion: a would-be holder is
+    // fail-closed out of the shell rather than dropped into an empty back-office
+    // whose only landing page (overview) 403s for them.
+    expect(hasAnyAdminPermission(userWith(["user.manage"]))).toBe(false);
+    expect(hasAnyAdminPermission(userWith(["card.reveal_pan"]))).toBe(false);
+  });
 });

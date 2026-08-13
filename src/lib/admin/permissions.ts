@@ -29,10 +29,10 @@ export type PermissionSlug = (typeof Permission)[keyof typeof Permission];
  * approvals + overview; ledger/kyc/merchant screens are a later lot but their
  * bearers still belong in the shell.)
  *
- * `card.reveal_pan` is intentionally EXCLUDED: no admin screen consumes it yet,
- * so a would-be holder is fail-closed out of the shell rather than dropped into
- * an empty back-office. Add it here in the same lot that ships the card-reveal
- * screen, never before.
+ * `card.reveal_pan` and `user.manage` are intentionally EXCLUDED: no admin
+ * screen consumes either yet, so a would-be holder is fail-closed out of the
+ * shell rather than dropped into an empty, 403-erroring back-office. Add each
+ * here in the same lot that ships its landing screen, never before.
  */
 export const ADMIN_PERMISSIONS: readonly PermissionSlug[] = [
   Permission.ConfigRead,
@@ -45,7 +45,6 @@ export const ADMIN_PERMISSIONS: readonly PermissionSlug[] = [
   Permission.LedgerRead,
   Permission.AuditRead,
   Permission.PayoutApprove,
-  Permission.UserManage,
 ];
 
 /** True when the user holds the given permission slug. Null-safe (guest → false). */
