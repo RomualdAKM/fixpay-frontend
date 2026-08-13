@@ -1,12 +1,12 @@
 "use client";
 
-import { CreditCard } from "lucide-react";
+import { CreditCard, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 import type { ReceiptRow } from "@/components/ui/SuccessScreen";
 import { SuccessScreen } from "@/components/ui/SuccessScreen";
-import { useCardRechargeResult } from "@/lib/api/cardHooks";
+import { useCardRechargeStatus } from "@/lib/api/cardHooks";
 import { isCardOrderFinal } from "@/lib/api/status";
 import { formatDate, formatUsdFigure } from "@/lib/format";
 import { formatMoney } from "@/lib/money";
@@ -17,19 +17,30 @@ import { formatMoney } from "@/lib/money";
  * Le reçu n'est composé QUE sur l'état final `success` : une recharge encore en
  * cours ou échouée montre son état réel, jamais un « carte alimentée » factice.
  * Le montant crédité (USD) et le coût débité (XOF) viennent de la ressource, pas
- * d'un barème recalculé côté client. Il n'existe pas d'endpoint de statut : le
- * résultat est lu dans le cache écrit par la mutation.
+ * d'un barème recalculé côté client. L'état est POLLÉ (borné) sur
+ * GET /cards/{uuid}/recharges/{ruuid} jusqu'à l'état final, comme le dépôt.
  */
 export default function CardTopUpSuccessPage() {
   const uuid = useSearchParams().get("uuid");
-  const rechargeQuery = useCardRechargeResult(uuid);
+  const rechargeQuery = useCardRechargeStatus(uuid);
   const recharge = rechargeQuery.data;
 
-  // La recharge n'a pas d'endpoint GET : le résultat n'existe qu'en cache,
-  // écrit par la mutation (useCardRechargeResult ne fetche jamais). Un uuid
-  // sans résultat en cache — rechargement de la page, URL rouverte, navigation
-  // arrière restaurée — est un état TERMINAL « reçu indisponible », pas un
-  // chargement : afficher un spinner ici bloquerait l'écran pour toujours.
+  // Premier aller-retour du poll : on attend le premier état réel plutôt que
+  // d'afficher un reçu vide.
+  if (rechargeQuery.isPending) {
+    return (
+      <main className="mx-auto flex min-h-dvh w-full max-w-[430px] flex-col items-center justify-center px-6 text-center">
+        <Loader2 size={28} className="text-primary animate-spin" aria-hidden />
+        <p className="text-text-muted mt-4 text-[13px] leading-[19px]">
+          Vérification de l&apos;alimentation…
+        </p>
+      </main>
+    );
+  }
+
+  // Pas de résultat en cache (rechargement de la page, URL rouverte) : sans
+  // l'UUID de carte, le statut n'est pas interrogeable — état TERMINAL « reçu
+  // indisponible », jamais un spinner infini.
   if (!recharge) {
     return (
       <main className="mx-auto flex min-h-dvh w-full max-w-[430px] flex-col items-center justify-center px-6 text-center">

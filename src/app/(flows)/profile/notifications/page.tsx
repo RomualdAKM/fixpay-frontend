@@ -7,7 +7,7 @@ import { BottomNav } from "@/components/layout/BottomNav";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { InfoBanner } from "@/components/ui/InfoBanner";
 import { SettingsToggleRow } from "@/components/ui/SettingsToggleRow";
-import { user } from "@/lib/mock-data";
+import { useAuth } from "@/lib/auth";
 
 /** Seuils proposés — au-dessous, l'opération n'entraîne aucune alerte. */
 const DEFAULT_THRESHOLD = "≥ 1 000 FCFA";
@@ -112,6 +112,7 @@ function RequiredSettingRow({
  * (avec ~200px libres à sa droite) se lisait comme un accident de gabarit.
  */
 export default function NotificationsSettingsPage() {
+  const { user } = useAuth();
   const [deposits, setDeposits] = useState(true);
   const [cardDebits, setCardDebits] = useState(true);
   const [withdrawals, setWithdrawals] = useState(true);
@@ -221,7 +222,7 @@ export default function NotificationsSettingsPage() {
           />
           <SettingsToggleRow
             title="Notifications e-mail"
-            subtitle={user.email}
+            subtitle={user?.email ?? "Votre adresse e-mail"}
             checked={email}
             onChange={setEmail}
             divider

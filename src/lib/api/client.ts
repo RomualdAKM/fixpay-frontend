@@ -28,7 +28,11 @@ const XSRF_HEADER_NAME = "X-XSRF-TOKEN";
 
 export interface ApiFetchOptions {
   method?: string;
-  /** JSON body; serialized and sent with `Content-Type: application/json`. */
+  /**
+   * Request body. A `FormData` is sent as-is (multipart, for KYC document
+   * uploads) and the browser sets its own `Content-Type` boundary; any other
+   * value is JSON-serialized and sent with `Content-Type: application/json`.
+   */
   body?: unknown;
   /** Single-use PIN ticket, echoed as `X-Pin-Ticket` for money operations. */
   pinTicket?: string;
@@ -74,7 +78,11 @@ function buildHeaders(
     "X-Requested-With": "XMLHttpRequest",
   });
 
-  if (hasBody) headers.set("Content-Type", "application/json");
+  // A FormData body must NOT carry an explicit Content-Type: the browser
+  // computes the multipart boundary itself. Only JSON bodies are typed here.
+  if (hasBody && !(options.body instanceof FormData)) {
+    headers.set("Content-Type", "application/json");
+  }
 
   if (MUTATING_METHODS.has(method)) {
     const xsrf = readCookie(XSRF_COOKIE_NAME);
@@ -127,11 +135,17 @@ async function performRequest(
     await ensureCsrfCookie();
   }
 
+  const body = hasBody
+    ? options.body instanceof FormData
+      ? options.body
+      : JSON.stringify(options.body)
+    : undefined;
+
   return fetch(`${API_BASE}${path}`, {
     method,
     credentials: "include",
     headers: buildHeaders(method, options, hasBody),
-    body: hasBody ? JSON.stringify(options.body) : undefined,
+    body,
     signal: options.signal,
   });
 }

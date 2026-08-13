@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, type RenderResult } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
 
+import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { AuthProvider } from "@/lib/auth";
 
 /** A QueryClient with retries off, for deterministic tests. */
@@ -33,6 +34,26 @@ export function renderWithAuth(ui: ReactElement): RenderResult & {
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={client}>
       <AuthProvider>{children}</AuthProvider>
+    </QueryClientProvider>
+  );
+  const result = render(ui, { wrapper });
+  return { ...result, client };
+}
+
+/**
+ * Render a full page: the providers a tab/flow screen expects (QueryClient +
+ * ThemeProvider for AppHeader's ThemeToggle + AuthProvider for useAuth). The
+ * caller still mocks `next/navigation` where the page reads the pathname.
+ */
+export function renderPage(ui: ReactElement): RenderResult & {
+  client: QueryClient;
+} {
+  const client = makeTestClient();
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={client}>
+      <ThemeProvider>
+        <AuthProvider>{children}</AuthProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
   const result = render(ui, { wrapper });

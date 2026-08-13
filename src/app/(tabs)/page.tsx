@@ -7,19 +7,57 @@ import { ChevronRight } from "lucide-react";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { InlineError } from "@/components/feedback/InlineError";
-import { CardRow, CardRowList } from "@/components/ui/CardRow";
-import { ProgressBar } from "@/components/ui/ProgressBar";
 import { SectionHeader } from "@/components/ui/SectionHeader";
+import { StatusDot } from "@/components/ui/StatusDot";
 import { WalletMovements } from "@/components/ui/WalletMovements";
 import {
   WalletHeroActions,
   WalletHeroCard,
 } from "@/components/ui/WalletHeroCard";
+import { useKyc } from "@/lib/api/accountHooks";
+import { useCards } from "@/lib/api/cardHooks";
+import type { CardStatus, KycStatus } from "@/lib/api/types";
 import { useWallet, useWalletTransactions } from "@/lib/api/moneyHooks";
 import { walletTransactionToRow } from "@/lib/api/presenters";
-import { formatAmount, formatFcfa } from "@/lib/format";
+import { cardExpiry, cardStatusLabel, maskedPan } from "@/lib/cards";
 import { formatMoney } from "@/lib/money";
-import { cards, depositFacts, verification, withdrawFacts } from "@/lib/mock-data";
+import { depositFacts, withdrawFacts } from "@/lib/mock-data";
+import { cn } from "@/lib/utils";
+
+const MASKED_BALANCE = "••••••";
+
+const STATUS_DOT: Record<CardStatus, string> = {
+  active: "bg-success",
+  frozen: "bg-warning",
+  pending: "bg-warning",
+  cancelled: "bg-danger",
+};
+
+/**
+ * Ligne KYC de l'Accueil, pilotée par le VRAI statut (GET /api/kyc) : rien ne
+ * s'affiche une fois vérifié, sinon l'invite est adaptée à l'état réel. Plus
+ * aucune « étape X sur N » fabriquée ni plafond inventé.
+ */
+const HOME_KYC: Record<
+  Exclude<KycStatus, "approved">,
+  { hint: string; action: string; actionClass: string }
+> = {
+  none: {
+    hint: "Ajoutez une pièce d'identité pour lever vos plafonds mensuels.",
+    action: "Commencer",
+    actionClass: "text-primary",
+  },
+  pending: {
+    hint: "Vos pièces sont en cours d'examen.",
+    action: "En cours",
+    actionClass: "text-warning",
+  },
+  rejected: {
+    hint: "Une pièce doit être renvoyée pour valider votre identité.",
+    action: "À corriger",
+    actionClass: "text-danger",
+  },
+};
 
 /** 145px hero placeholder while the balance loads. */
 function HeroSkeleton() {
@@ -34,39 +72,16 @@ function HeroSkeleton() {
 /**
  * Écran 02 · Accueil — LE TABLEAU DE BORD, et le seul.
  *
- * La répartition avec l'écran 03 est désormais tranchée : l'Accueil donne la
- * vue d'ensemble et l'action rapide (solde, cartes, flux consolidé toutes
- * sources, plafonds), le Portefeuille montre le compte FCFA lui-même — comptes
- * Mobile Money liés, opérations non abouties, relevé du seul portefeuille. Les
- * deux écrans ne partagent plus ni bloc ni liste.
+ * La répartition avec l'écran 03 est tranchée : l'Accueil donne la vue
+ * d'ensemble et l'action rapide (solde, cartes, flux consolidé), le
+ * Portefeuille montre le compte FCFA lui-même. Les deux écrans ne partagent ni
+ * bloc ni liste.
  *
- * LA LISTE — « dernières opérations » veut dire TOUTES SOURCES : les dépenses
- * par carte et les mouvements du portefeuille, dans un seul ordre
- * chronologique. C'est ce qu'un tableau de bord doit répondre, et c'est aussi
- * ce qui la rend structurellement différente du relevé de l'écran 03, qui
- * n'expose que le second jeu. Les deux vues sortent d'un grand livre unique
- * (voir `mock-data`) : plus aucune ligne n'est saisie deux fois.
- *
- * LA GOUTTIÈRE — tranchée dans l'autre sens que la passe précédente. Les
- * mouvements internes portaient une pastille de direction, les lignes
- * marchands réservaient sa place : 41px de vide devant le texte d'une ligne
- * sur deux, et une liste qui paraissait cassée plutôt que sobre. Donner la
- * pastille à toutes les lignes reconstituerait la colonne de glyphes
- * identiques que l'audit a fait supprimer ; elle est donc RETIRÉE. Le sens du
- * mouvement est déjà porté par le signe et la couleur du montant, à droite —
- * la pastille était un troisième signal pour la même information. Tout
- * commence au même bord, ici comme sur l'écran 03.
- *
- * RYTHME VERTICAL — inchangé, sur une échelle de 4 pas et un seul rôle par
- * pas : 8 à l'intérieur d'un groupe, 12 d'un en-tête à sa première rangée,
- * 16 de l'en-tête de page au premier bloc, 24 entre deux groupes (32 en
- * desktop). Le plafond du mobile passe en fin de page (`max-lg:order-last`)
- * sans être dupliqué : c'est le même contenu, dans la colonne où il tombe.
- *
- * DENSITÉ — la page s'arrêtait à mi-hauteur d'un 1440×900. Elle porte
- * maintenant, sans un pixel de décor ajouté : le coût réel des deux actions du
- * hero, l'état de vérification qui explique les plafonds, le flux consolidé
- * (9 lignes au lieu de 5) et les plafonds avec leur dénominateur.
+ * TOUTES LES DONNÉES SONT RÉELLES : le solde (GET /api/wallet), le statut de
+ * vérification (GET /api/kyc), les cartes et leur solde (GET /api/cards), et le
+ * flux d'opérations (GET /api/wallet/transactions). Aucun statut KYC, aucune
+ * carte ni aucun solde fabriqués. Le barème dépôt/retrait est le seul contenu
+ * statique — c'est le tarif du produit, pas une donnée de compte.
  */
 export default function HomePage() {
   // Un SEUL œil sur l'écran : le geste « masquer mes soldes » est un geste de
@@ -75,6 +90,13 @@ export default function HomePage() {
 
   const walletQuery = useWallet();
   const txQuery = useWalletTransactions();
+  const kycQuery = useKyc();
+  const cardsQuery = useCards();
+  const cards = cardsQuery.data ?? [];
+
+  const kycStatus = kycQuery.data?.status;
+  const kycInfo =
+    kycStatus && kycStatus !== "approved" ? HOME_KYC[kycStatus] : null;
 
   // Le tableau de bord montre les mouvements récents : la première page du
   // relevé, déjà triée par le backend (plus récent en tête).
@@ -92,7 +114,7 @@ export default function HomePage() {
         <AppHeader showLogo bellDot desktopTitle="Accueil" />
 
         <div className="flex flex-col lg:mt-8 lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-8">
-          {/* Colonne A — argent : solde, vérification, cartes, plafonds */}
+          {/* Colonne A — argent : solde, vérification, cartes */}
           <div className="contents lg:block">
             <div className="mt-4 lg:mt-0">
               {walletQuery.isPending ? (
@@ -122,94 +144,131 @@ export default function HomePage() {
               )}
             </div>
 
-            {/* LE COÛT DES DEUX ACTIONS, sous les deux actions. « Dépôt » et
-                « Retrait » étaient exposés en primaire sans frais ni délai :
-                sur un produit de recharge Mobile Money ouest-africain, une
-                opération sans contrepartie chiffrée n'est pas crédible. Les
-                valeurs sortent des mêmes objets que les écrans 04 et 05 (rien
-                n'est réécrit ici), donc le prix annoncé sur le tableau de bord
-                est exactement celui du tunnel. */}
+            {/* LE COÛT DES DEUX ACTIONS, sous les deux actions. Les valeurs
+                sortent des mêmes objets de barème que les écrans 04 et 05 : le
+                prix annoncé sur le tableau de bord est exactement celui du
+                tunnel. C'est un tarif produit, pas une donnée de compte. */}
             <p className="text-text-muted mt-2 text-[12px] leading-[17px]">
               Dépôt&nbsp;: {depositFacts.feeLabel.toLowerCase()}, crédité{" "}
               {depositFacts.delay.toLowerCase()} · Retrait&nbsp;:{" "}
               {withdrawFacts.feeLabel}, {withdrawFacts.delay.toLowerCase()}
             </p>
 
-            {/* CE QUI EXPLIQUE LES PLAFONDS, 200px au-dessus d'eux. Un compte à
-                1,8 M FCFA de solde avec un KYC inachevé n'est pas une
-                incohérence — c'est un palier — mais le produit ne le disait
-                nulle part, et la notification de blocage (écran 28) arrivait
-                sans affordance. Ligne nue à filets, un chevron, aucune tuile,
-                aucun fond teinté : c'est une ligne d'action, pas un bandeau. */}
-            <Link
-              href="/profile/kyc"
-              className="border-border mt-6 flex items-center gap-3 border-y py-[13px] lg:mt-8 lg:transition-opacity lg:hover:opacity-80"
-            >
-              <span className="min-w-0 flex-1">
-                <span className="text-text block text-[13.5px] leading-[18px] font-medium">
-                  Vérification d&apos;identité
+            {/* CE QUI EXPLIQUE LES PLAFONDS, piloté par le vrai statut KYC :
+                rien une fois vérifié, sinon l'invite adaptée à l'état réel.
+                Ligne nue à filets, un chevron, aucune tuile — c'est une ligne
+                d'action, pas un bandeau. */}
+            {kycInfo ? (
+              <Link
+                href="/profile/kyc"
+                className="border-border mt-6 flex items-center gap-3 border-y py-[13px] lg:mt-8 lg:transition-opacity lg:hover:opacity-80"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="text-text block text-[13.5px] leading-[18px] font-medium">
+                    Vérification d&apos;identité
+                  </span>
+                  <span className="text-text-muted mt-[3px] block text-[11.5px] leading-[16px]">
+                    {kycInfo.hint}
+                  </span>
                 </span>
-                <span className="text-text-muted mt-[3px] block text-[11.5px] leading-[16px]">
-                  {verification.currentTitle} à fournir pour porter votre
-                  plafond mensuel à{" "}
-                  {formatFcfa(verification.upgradedMonthlyLimit)}.
+                <span
+                  className={cn(
+                    "shrink-0 text-[11.5px] leading-[15px] font-medium",
+                    kycInfo.actionClass,
+                  )}
+                >
+                  {kycInfo.action}
                 </span>
-              </span>
-              <span className="text-warning shrink-0 text-[11.5px] leading-[15px] font-medium">
-                Étape {verification.step} sur {verification.total}
-              </span>
-              <ChevronRight
-                size={16}
-                strokeWidth={2}
-                absoluteStrokeWidth
-                aria-hidden="true"
-                className="text-icon-muted -mr-[4px] shrink-0"
-              />
-            </Link>
+                <ChevronRight
+                  size={16}
+                  strokeWidth={2}
+                  absoluteStrokeWidth
+                  aria-hidden="true"
+                  className="text-icon-muted -mr-[4px] shrink-0"
+                />
+              </Link>
+            ) : null}
 
             {/* Les cartes vivent ici et nulle part ailleurs dans les onglets de
                 compte : la rangée mène à l'écran de la carte, où « Alimenter »,
-                « Payer » et « Bloquer » sont déjà hiérarchisés. */}
+                « Payer » et « Bloquer » sont déjà hiérarchisés. Solde réel de la
+                carte (USD), masqué par l'œil unique de l'écran. */}
             <section className="mt-6 lg:mt-8">
               <SectionHeader title="Mes cartes" />
-              <CardRowList className="mt-2">
-                {cards.map((card) => (
-                  <CardRow key={card.id} card={card} hidden={hidden} />
-                ))}
-              </CardRowList>
-            </section>
-
-            {/* SÉMANTIQUE DE LA JAUGE, tranchée pour les deux écrans : la barre
-                montre le CONSOMMÉ, et le texte annonce toujours consommé ET
-                total. « 190 000 restants » sous une barre remplie aux deux
-                tiers laissait le lecteur arbitrer entre le dessin et le
-                chiffre ; sans dénominateur, deux jauges voisines n'étaient même
-                pas comparables. Le titre du groupe porte le mot qui lève
-                l'ambiguïté, une fois, pour les deux rangées et leurs barres. */}
-            <section className="mt-6 max-lg:order-last lg:mt-8">
-              <SectionHeader title="Consommation des plafonds · avril" />
-              <ul className="mt-3 space-y-4">
-                {cards.map((card) => (
-                  <li key={card.id}>
-                    <div className="flex items-baseline justify-between gap-3">
-                      <p className="text-text-secondary min-w-0 truncate text-[12.5px] leading-[16px]">
-                        {card.label}
-                      </p>
-                      <p className="text-text-secondary shrink-0 text-[12.5px] leading-[16px] font-medium">
-                        {formatAmount(card.monthlyUsed)} sur{" "}
-                        {formatFcfa(card.monthlyLimit)}
-                      </p>
+              {cardsQuery.isError ? (
+                <div className="mt-2">
+                  <InlineError error={cardsQuery.error} />
+                </div>
+              ) : cardsQuery.isPending ? (
+                <div className="border-border mt-2 border-y" aria-hidden="true">
+                  {[0, 1].map((row) => (
+                    <div
+                      key={row}
+                      className="flex items-center gap-3 py-[15px]"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="bg-surface-2 h-[13px] w-[130px] animate-pulse rounded-xs" />
+                        <div className="bg-surface-2 mt-[7px] h-[11px] w-[90px] animate-pulse rounded-xs" />
+                      </div>
                     </div>
-                    <div className="mt-2">
-                      <ProgressBar
-                        percent={Math.round(
-                          (card.monthlyUsed / card.monthlyLimit) * 100,
-                        )}
+                  ))}
+                </div>
+              ) : cards.length === 0 ? (
+                <div className="border-border mt-2 border-y">
+                  <Link
+                    href="/cards/new"
+                    className="text-primary focus-visible:ring-primary/60 flex items-center gap-3 py-[15px] text-[13.5px] font-medium focus-visible:ring-2 focus-visible:outline-none lg:hover:opacity-80"
+                  >
+                    <span className="min-w-0 flex-1">Ajouter une carte</span>
+                    <ChevronRight
+                      size={16}
+                      strokeWidth={2}
+                      absoluteStrokeWidth
+                      aria-hidden="true"
+                      className="text-icon-muted -mr-[4px] shrink-0"
+                    />
+                  </Link>
+                </div>
+              ) : (
+                <div className="border-border divide-border mt-2 divide-y border-y">
+                  {cards.map((card) => (
+                    <Link
+                      key={card.uuid}
+                      href={`/cards/${card.uuid}`}
+                      className="flex items-center gap-3 py-[15px] lg:transition-opacity lg:hover:opacity-80"
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="text-text block truncate font-mono text-[13px] leading-[17px] font-medium tracking-[1px]">
+                          {maskedPan(card.pan_last4)}
+                        </span>
+                        <span className="text-text-secondary mt-[3px] flex items-center gap-[5px] text-[12.5px] leading-[16px]">
+                          <StatusDot
+                            size={6}
+                            colorClass={STATUS_DOT[card.status]}
+                          />
+                          {cardStatusLabel(card.status)} · Exp{" "}
+                          {cardExpiry(card)}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-right">
+                        <span className="text-text-muted block text-[11.5px] leading-[15px]">
+                          Solde
+                        </span>
+                        <span className="text-text block font-mono text-[15px] leading-[20px] font-semibold">
+                          {hidden ? MASKED_BALANCE : formatMoney(card.balance)}
+                        </span>
+                      </span>
+                      <ChevronRight
+                        size={16}
+                        strokeWidth={2}
+                        absoluteStrokeWidth
+                        aria-hidden="true"
+                        className="text-icon-muted -mr-[4px] shrink-0"
                       />
-                    </div>
-                  </li>
-                ))}
-              </ul>
+                    </Link>
+                  ))}
+                </div>
+              )}
             </section>
           </div>
 
@@ -223,8 +282,7 @@ export default function HomePage() {
               />
               {/* Mouvements réels du portefeuille (première page du relevé),
                   avec leurs états de chargement / erreur / vide réellement
-                  câblés. La liste s'arrête à la dernière rangée sans filet
-                  orphelin ; « Tout voir » mène au relevé complet. */}
+                  câblés. « Tout voir » mène au relevé complet. */}
               <WalletMovements
                 rows={recentRows}
                 loading={txQuery.isPending}

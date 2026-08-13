@@ -24,12 +24,21 @@ import {
   useSuspendCard,
 } from "@/lib/api/cardHooks";
 import { PinTicketAction, type CardTransaction } from "@/lib/api/types";
-import { cardExpiry, cardStatusLabel, cardTransactionLabel, maskedPan } from "@/lib/cards";
+import { cardBrand, cardExpiry, cardStatusLabel, cardTransactionLabel, maskedPan } from "@/lib/cards";
 import { formatDate } from "@/lib/format";
 import { formatMoney } from "@/lib/money";
+import { useAutoDismiss } from "@/lib/useAutoDismiss";
 import { cn } from "@/lib/utils";
 
 const MASKED_CARD_NUMBER = "•••• •••• •••• ••••";
+
+/**
+ * Fenêtre au-delà de laquelle un PAN/CVV révélé est repurgé automatiquement,
+ * même si l'écran reste monté (épaule indiscrète, capture d'écran). Le secret
+ * backend est éphémère : on ne le garde pas au-delà d'un délai borné côté
+ * client, comme le font les applications bancaires.
+ */
+const REVEAL_AUTO_HIDE_MS = 45_000;
 
 /** Group a full PAN into blocks of four: "4291123456784291" -> "4291 1234 …". */
 function groupPan(pan: string): string {
@@ -136,6 +145,11 @@ export default function CardDetailPage({
   const { reset: resetReveal } = reveal;
   useEffect(() => resetReveal, [resetReveal]);
 
+  // Auto-masquage borné : une fois les secrets révélés, ils sont repurgés seuls
+  // passé REVEAL_AUTO_HIDE_MS, même si l'écran reste ouvert. Annulé au masquage
+  // manuel et au démontage.
+  useAutoDismiss(Boolean(reveal.data), resetReveal, REVEAL_AUTO_HIDE_MS);
+
   if (cardQuery.error?.status === 404) notFound();
 
   const card = cardQuery.data;
@@ -172,9 +186,11 @@ export default function CardDetailPage({
               <div className="mt-4 lg:mt-0">
                 <VirtualCard
                   size="lg"
+                  brand={cardBrand(card.brand)}
                   number={faceNumber}
                   holder={card.cardholder_name}
                   expiry={revealed ? revealed.expiry : cardExpiry(card)}
+                  balance={formatMoney(card.balance)}
                 />
               </div>
 
@@ -268,6 +284,7 @@ export default function CardDetailPage({
               <section className="mt-8">
                 <SectionHeader title="Détails" />
                 <div className="mt-2">
+                  <SpecRow term="Solde" value={formatMoney(card.balance)} />
                   <SpecRow term="Titulaire" value={card.cardholder_name} />
                   <SpecRow term="Numéro" value={maskedPan(card.pan_last4)} />
                   <SpecRow term="Expiration" value={cardExpiry(card)} />

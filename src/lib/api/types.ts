@@ -46,6 +46,8 @@ export interface User {
   referral_code: string | null;
   kyc_level: number;
   status: UserStatus;
+  /** Whether a transactional PIN has been set (AuthController::userPayload). */
+  pin_set: boolean;
   email_verified: boolean;
 }
 
@@ -165,21 +167,24 @@ export type CardStatus = "pending" | "active" | "frozen" | "cancelled";
 /**
  * App\Http\Resources\CardResource.
  *
- * BACKEND REALITY: the resource exposes NO balance and NO network brand (Visa /
- * Mastercard). The card balance lives only in the ledger and is never sent to
- * the client; the network is not part of the payload either. Screens therefore
- * never render a fabricated USD balance, and the card face falls back to a
- * neutral visual — the data does not lie.
+ * The resource now exposes the card `balance` (Money, USD scale 2, sourced from
+ * the ledger) and the network `brand` (the BIN organization, e.g. "Visa" /
+ * "Mastercard"; null when the BIN carries none). Screens render the real
+ * balance — no fabricated amount, and none omitted either.
  */
 export interface Card {
   uuid: string;
   status: CardStatus;
   channel: string;
+  /** Network organization from the BIN: "Visa", "Mastercard", or null. */
+  brand: string | null;
   pan_last4: string;
   expiry_month: number;
   expiry_year: number;
   cardholder_name: string;
   currency: CurrencyCode;
+  /** Available card balance in the card currency (USD, scale 2). */
+  balance: Money;
   created_at: string | null;
 }
 
@@ -340,6 +345,56 @@ export interface Referral {
     created_at: string | null;
   }>;
   commission_balance: Money;
+}
+
+/**
+ * App\Domain\Referral\ReferralPayoutStatus. A payout is created `pending` and
+ * settles to `completed`; when `referral.payout_requires_approval` is on it
+ * stays `pending` until a reviewer approves it (maker-checker), otherwise it is
+ * settled synchronously and returns `completed`.
+ */
+export type ReferralPayoutStatus = "pending" | "completed" | "failed";
+
+/**
+ * POST /api/referral/payouts result (App\Http\Resources\ReferralPayoutResource).
+ * The whole available referral balance is swept into one payout to the wallet.
+ */
+export interface ReferralPayout {
+  uuid: string;
+  status: ReferralPayoutStatus;
+  amount: Money;
+  approved_at: string | null;
+  created_at: string | null;
+}
+
+/** App\Domain\Kyc\KycStatus — `none` is the never-submitted state. */
+export type KycStatus = "none" | "pending" | "approved" | "rejected";
+
+/** App\Domain\Kyc\KycDocumentType — the three files a submission requires. */
+export type KycDocumentType = "id_front" | "id_back" | "selfie";
+
+/**
+ * GET /api/kyc `data` (KycController::payload). `level` mirrors User.kyc_level
+ * (0 unverified, 1 after approval); `rejection_reason` is set only when
+ * `status` is `rejected`.
+ */
+export interface KycProfile {
+  uuid: string;
+  status: KycStatus;
+  level: number;
+  submitted_at: string | null;
+  reviewed_at: string | null;
+  rejection_reason: string | null;
+}
+
+/**
+ * The three files POST /api/kyc expects (SubmitKycRequest: each `required`,
+ * `mimetypes` per config/kyc.php, `max` KB). Sent as multipart FormData.
+ */
+export interface SubmitKycInput {
+  id_front: File;
+  id_back: File;
+  selfie: File;
 }
 
 /**

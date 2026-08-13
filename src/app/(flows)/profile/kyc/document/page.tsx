@@ -1,154 +1,71 @@
 "use client";
 
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
-import { Camera, Check, FileText, Upload, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Camera, Check, FileText, Loader2, Upload, X } from "lucide-react";
 
 import { BottomNav } from "@/components/layout/BottomNav";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { InlineError } from "@/components/feedback/InlineError";
 import { Button } from "@/components/ui/Button";
-import { SelectableRow } from "@/components/ui/SelectableRow";
 import { StickyActionBar } from "@/components/ui/StickyActionBar";
+import { useSubmitKyc } from "@/lib/api/accountHooks";
+import type { KycDocumentType } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
 
-type DocTypeId = "cni" | "passport";
-
-interface DocType {
-  id: DocTypeId;
-  title: string;
-  subtitle: string;
-}
-
 interface UploadZone {
-  id: string;
+  id: KycDocumentType;
   label: string;
-  /** Position dans la pièce (« 1 sur 2 ») — remplace l'icône « recharger ». */
   hint: string;
+  /** Selfie occupe la pleine largeur ; recto/verso partagent une rangée. */
+  full?: boolean;
 }
 
 interface ZoneState {
-  file?: { name: string; size: number };
-  /**
-   * Aperçu RÉEL de la face importée (objet URL). C'est le seul retour qui
-   * prouve à l'utilisateur qu'il a photographié la bonne face ; un nom de
-   * fichier et un poids ne le prouvent pas. Absent pour un PDF, qui n'est pas
-   * rendu par un `<img>`.
-   */
+  file?: File;
+  /** Aperçu réel (objet URL) — absent pour un PDF, non rendu par `<img>`. */
   previewUrl?: string;
   error?: string;
 }
 
 /**
- * En-tête de section de l'écran. 15px semi-bold sur --c-text : en 13px w500
- * text-secondary (SectionLabel), un en-tête de section était rigoureusement
- * du même style que le paragraphe d'introduction juste au-dessus.
+ * Les trois pièces EXIGÉES par SubmitKycRequest : `id_front`, `id_back`,
+ * `selfie`. Les identifiants de zone sont exactement les champs multipart
+ * attendus par POST /api/kyc.
  */
-function SectionTitle({
-  children,
-  className,
-}: {
-  children: string;
-  className?: string;
-}) {
-  return (
-    <h2
-      className={cn(
-        "text-text text-[15px] leading-[20px] font-semibold",
-        className,
-      )}
-    >
-      {children}
-    </h2>
-  );
-}
-
-/* Données locales (absentes de mock-data.ts) */
-const DOC_TYPES: DocType[] = [
-  {
-    id: "cni",
-    title: "Carte nationale d'identité",
-    subtitle: "Recto + verso requis",
-  },
-  {
-    id: "passport",
-    title: "Passeport",
-    subtitle: "Page d'identité uniquement (photo + infos)",
-  },
+const UPLOAD_ZONES: UploadZone[] = [
+  { id: "id_front", label: "Recto de la pièce", hint: "1 sur 2" },
+  { id: "id_back", label: "Verso de la pièce", hint: "2 sur 2" },
+  { id: "selfie", label: "Selfie de vérification", hint: "Visage bien visible", full: true },
 ];
 
-/**
- * Zones d'import — les libellés s'adaptent au type de document choisi.
- * L'icône « RotateCw » du verso a disparu : une flèche de rechargement pour
- * désigner la face arrière d'une carte était une attribution automatique par
- * proximité de mot. Les deux faces portent le glyphe de la pièce et se
- * distinguent par leur rang (1 sur 2 / 2 sur 2).
- */
-const UPLOAD_ZONES: Record<DocTypeId, UploadZone[]> = {
-  cni: [
-    { id: "cni-recto", label: "Recto", hint: "1 sur 2" },
-    { id: "cni-verso", label: "Verso", hint: "2 sur 2" },
-  ],
-  passport: [
-    { id: "passport-page", label: "Page d'identité", hint: "1 sur 1" },
-  ],
-};
+/** config/kyc.php : `allowed_mimes` et `max_document_size_kb` (8 Mo). */
+const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+const MAX_BYTES = 8 * 1024 * 1024;
 
-/**
- * Conditions d'acceptation. Elles étaient une SECTION à part (en-tête + quatre
- * puces, ~124px) posée en fin d'écran, donc exactement là où la barre d'action
- * la guillotinait en plein glyphe. Ce sont des contraintes de prise de vue :
- * leur place est sous les zones d'import, en une ligne de service compacte.
- */
 const CHECKLIST = [
   "Document en cours de validité",
   "photo nette et non recadrée",
   "toutes les mentions visibles",
-  "JPG, PNG ou PDF, 10 Mo max",
+  "JPG, PNG, WebP ou PDF, 8 Mo max",
 ].join(" · ");
 
-const ACCEPTED_TYPES = ["image/jpeg", "image/png", "application/pdf"];
-const MAX_BYTES = 10 * 1024 * 1024;
-
-/** Poids du fichier en Mo, virgule française. */
 function formatSize(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1).replace(".", ",")} Mo`;
 }
 
 /**
- * Écran 13 · KYC Document — choix du type de pièce, zones d'import à ÉTATS
- * (vide / rempli / erreur), conditions à plat, CTA épinglé et inactif tant
- * que les faces requises ne sont pas importées.
- *
- * Recomposition post-audit : la zone d'import était le cœur fonctionnel de
- * l'écran et n'avait qu'un seul état ; le CTA était pleinement actif alors
- * qu'aucun fichier n'existait ; les coches vertes validaient des exigences
- * non encore vérifiées ; et le bleu de marque, posé sur chaque glyphe, ne
- * désignait plus la sélection.
- *
- * ÉTAPE 11 (composition) :
- * - le paragraphe d'introduction disparaît : « Assurez-vous que votre document
- *   est en cours de validité » redisait mot pour mot la première condition,
- *   54px plus haut. Un doublon en tête d'écran qui poussait tout le reste ;
- * - la section « Conditions » (en-tête + 4 puces) devient une ligne de service
- *   sous les zones d'import, où elle qualifie ce qu'elle décrit. Avec le
- *   doublon supprimé, l'écran ENTIER tient au-dessus de la barre d'action en
- *   390×780 : plus rien n'est guillotiné en plein glyphe ;
- * - le glyphe des zones d'import n'est plus `CreditCard`. Une icône de carte
- *   bancaire pour une carte nationale d'identité était une attribution par
- *   proximité de mot, et c'était en outre le glyphe exact de l'onglet
- *   « Cartes » de la BottomNav, 550px plus bas. C'est l'action qui est
- *   figurée — photographier —, la même pour les deux types de pièce ;
- * - desktop : la colonne passe de 720 à 840px, ce qui ramène la bande morte
- *   sidebar/contenu de ~270 à ~210px.
+ * Écran 13 · KYC Document — import réel des trois pièces (recto, verso, selfie)
+ * avec validation type/taille côté client, puis soumission MULTIPART à
+ * POST /api/kyc. Le statut repasse à `pending` et l'écran renvoie au suivi.
  */
 export default function KycDocumentPage() {
-  const [docType, setDocType] = useState<DocTypeId>("cni");
+  const router = useRouter();
+  const submit = useSubmitKyc();
   const [zones, setZones] = useState<Record<string, ZoneState>>({});
 
-  const currentZones = UPLOAD_ZONES[docType];
-  const ready = currentZones.every((zone) => zones[zone.id]?.file);
+  const ready = UPLOAD_ZONES.every((zone) => zones[zone.id]?.file);
 
-  /* Les objets URL des aperçus sont révoqués au remplacement, au retrait et
-     au démontage : sans cela chaque photo importée reste en mémoire. */
   const zonesRef = useRef(zones);
   useEffect(() => {
     zonesRef.current = zones;
@@ -172,24 +89,23 @@ export default function KycDocumentPage() {
 
   const handleFile = (zoneId: string, event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    // Permet de réimporter le même fichier après une suppression.
     event.target.value = "";
     if (!file) return;
 
     if (!ACCEPTED_TYPES.includes(file.type)) {
       replaceZone(zoneId, {
-        error: "Format refusé — JPG, PNG ou PDF uniquement.",
+        error: "Format refusé — JPG, PNG, WebP ou PDF uniquement.",
       });
       return;
     }
     if (file.size > MAX_BYTES) {
       replaceZone(zoneId, {
-        error: `Fichier trop lourd (${formatSize(file.size)}) — 10 Mo maximum.`,
+        error: `Fichier trop lourd (${formatSize(file.size)}) — 8 Mo maximum.`,
       });
       return;
     }
     replaceZone(zoneId, {
-      file: { name: file.name, size: file.size },
+      file,
       previewUrl: file.type.startsWith("image/")
         ? URL.createObjectURL(file)
         : undefined,
@@ -206,38 +122,33 @@ export default function KycDocumentPage() {
     });
   };
 
+  const handleSubmit = () => {
+    const idFront = zones.id_front?.file;
+    const idBack = zones.id_back?.file;
+    const selfie = zones.selfie?.file;
+    if (!idFront || !idBack || !selfie) return;
+
+    submit.mutate(
+      { id_front: idFront, id_back: idBack, selfie },
+      { onSuccess: () => router.push("/profile/kyc") },
+    );
+  };
+
   return (
     <>
       <main className="flex-1 px-5 pt-[54px] pb-24 lg:mx-auto lg:w-full lg:max-w-[840px] lg:px-10 lg:pt-9 lg:pb-12">
         <PageHeader title="Pièce d'identité" backHref="/profile/kyc" />
 
-        <SectionTitle className="mt-8">Type de document</SectionTitle>
-        <div className="mt-3 space-y-2.5">
-          {DOC_TYPES.map((doc) => (
-            /* Plus d'IconTile : le même carré bleu devant deux lignes ne
-               distinguait pas une CNI d'un passeport — le libellé le fait. */
-            <SelectableRow
-              key={doc.id}
-              title={doc.title}
-              subtitle={doc.subtitle}
-              radioSize={20}
-              selected={docType === doc.id}
-              selectedVariant="outline"
-              height={66}
-              onSelect={() => setDocType(doc.id)}
-            />
-          ))}
-        </div>
-
-        <SectionTitle className="mt-8">Photos du document</SectionTitle>
+        <h2 className="text-text mt-8 text-[15px] leading-[20px] font-semibold">
+          Photos du document
+        </h2>
         <div className="mt-3 grid grid-cols-2 gap-3">
-          {currentZones.map((zone) => {
+          {UPLOAD_ZONES.map((zone) => {
             const state = zones[zone.id] ?? {};
             const inputId = `upload-${zone.id}`;
-            const single = currentZones.length === 1;
 
             return (
-              <div key={zone.id} className={cn(single && "col-span-2")}>
+              <div key={zone.id} className={cn(zone.full && "col-span-2")}>
                 <input
                   id={inputId}
                   type="file"
@@ -247,9 +158,6 @@ export default function KycDocumentPage() {
                 />
 
                 {state.file ? (
-                  /* État rempli : APERÇU de la face importée (le seul retour
-                     qui prouve que la bonne face a été photographiée), puis
-                     nom et poids, puis les deux actions. */
                   <div className="border-border bg-surface flex h-[118px] flex-col justify-between rounded-md border p-3.5">
                     <div className="flex items-start gap-2.5">
                       {state.previewUrl ? (
@@ -270,8 +178,6 @@ export default function KycDocumentPage() {
                           </span>
                         </span>
                       ) : (
-                        /* PDF : pas d'aperçu possible, le glyphe du format
-                           tient lieu de vignette. */
                         <span className="bg-surface-2 border-border flex h-10 w-14 shrink-0 items-center justify-center rounded-sm border">
                           <FileText
                             size={16}
@@ -312,16 +218,10 @@ export default function KycDocumentPage() {
                     </div>
                   </div>
                 ) : (
-                  /* État vide / erreur : filet 1px pointillé, fond au survol
-                     pour signaler la zone cliquable. */
                   <label
                     htmlFor={inputId}
                     className={cn(
                       "hover:bg-surface flex h-[118px] cursor-pointer flex-col items-center justify-center rounded-md border border-dashed px-4 transition-colors",
-                      // Desktop : la zone fait 320px de large — le contenu s'y
-                      // aligne en ligne plutôt que de flotter au centre d'un
-                      // rectangle presque vide.
-                      "lg:flex-row lg:justify-start lg:gap-4 lg:px-6",
                       "peer-focus-visible:ring-primary/60 peer-focus-visible:ring-2",
                       state.error ? "border-danger" : "border-border-strong",
                     )}
@@ -341,14 +241,10 @@ export default function KycDocumentPage() {
                         className="text-icon-muted shrink-0"
                       />
                     )}
-                    <span className="mt-2.5 flex flex-col items-center lg:mt-0 lg:items-start">
+                    <span className="mt-2.5 flex flex-col items-center">
                       <span className="text-text text-[12.5px] leading-[16px] font-medium">
                         {zone.label}
                       </span>
-                      {/* Le format accepté n'est plus redit ici : il est dans
-                          la ligne de conditions, sous la grille. Une mention
-                          qui n'existait qu'à lg faisait en outre de la zone
-                          deux objets différents selon la largeur. */}
                       <span className="text-text-muted mt-[3px] text-[11.5px] leading-[15px]">
                         {zone.hint} · Importer
                       </span>
@@ -366,30 +262,34 @@ export default function KycDocumentPage() {
           })}
         </div>
 
-        {/* Conditions de prise de vue : rattachées aux zones qu'elles
-            qualifient (8px), pas érigées en section de fin d'écran. */}
         <p className="text-text-secondary mt-2 text-[12px] leading-[18px]">
           {CHECKLIST}
         </p>
 
-        {!ready && (
+        {submit.isError && <InlineError error={submit.error} className="mt-6" />}
+
+        {!ready && !submit.isError && (
           <p className="text-text-muted mt-8 text-[12px] leading-[16px]">
-            {docType === "cni"
-              ? "Importez le recto et le verso pour pouvoir soumettre."
-              : "Importez la page d'identité pour pouvoir soumettre."}
+            Importez le recto, le verso et le selfie pour pouvoir soumettre.
           </p>
         )}
 
-        {/* L'état inactif n'est plus une opacité posée sur le CTA : c'est un
-            bouton désactivé À PART ENTIÈRE (surface neutre, libellé muted),
-            donc lisible. `opacity-45` sur un aplat bleu descendait le libellé
-            blanc sous tout seuil de contraste — exactement le raccourci que
-            l'audit a fait supprimer sur l'écran 12. */}
         <StickyActionBar>
           <div className="lg:mt-10">
             {ready ? (
-              <Button href="/profile/kyc" className="lg:max-w-[320px]">
-                Soumettre le document
+              <Button
+                onClick={handleSubmit}
+                disabled={submit.isPending}
+                className="lg:max-w-[320px]"
+              >
+                {submit.isPending ? (
+                  <span className="inline-flex items-center gap-2">
+                    <Loader2 size={16} className="animate-spin" aria-hidden />
+                    Envoi en cours…
+                  </span>
+                ) : (
+                  "Soumettre les pièces"
+                )}
               </Button>
             ) : (
               <button
@@ -397,7 +297,7 @@ export default function KycDocumentPage() {
                 disabled
                 className="border-border bg-surface-2 text-text-muted inline-flex h-[50px] w-full cursor-not-allowed items-center justify-center rounded-md border text-[15px] font-semibold lg:max-w-[320px]"
               >
-                Soumettre le document
+                Soumettre les pièces
               </button>
             )}
           </div>

@@ -43,3 +43,16 @@ export const CARD_ORDER_FINAL_STATES = ["success", "failed"] as const;
 export function isCardOrderFinal(state: string): boolean {
   return (CARD_ORDER_FINAL_STATES as readonly string[]).includes(state);
 }
+
+/**
+ * Referral payout states, mirroring App\Domain\Referral\ReferralPayoutStatus.
+ * `completed` means the balance reached the wallet; `pending` means the payout
+ * is awaiting maker-checker approval (referral.payout_requires_approval).
+ */
+export function isReferralPayoutSettled(status: string): boolean {
+  return status === "completed";
+}
+
+export function isReferralPayoutPendingApproval(status: string): boolean {
+  return status === "pending";
+}

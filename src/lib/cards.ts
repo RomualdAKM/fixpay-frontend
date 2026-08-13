@@ -18,6 +18,17 @@ export function cardExpiry(card: Pick<Card, "expiry_month" | "expiry_year">): st
   return `${month}/${year}`;
 }
 
+/**
+ * Map the API network brand ("Visa" / "Mastercard", or null) to the visual the
+ * card face renders. Defaults to Visa when the BIN carries no organization, so
+ * the face always has a network mark without inventing a specific one.
+ */
+export function cardBrand(
+  brand: string | null,
+): "visa" | "mastercard" {
+  return brand?.toLowerCase().includes("master") ? "mastercard" : "visa";
+}
+
 const STATUS_LABELS: Record<CardStatus, string> = {
   pending: "En cours de création",
   active: "Active",

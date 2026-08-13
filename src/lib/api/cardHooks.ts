@@ -17,8 +17,10 @@ import {
   enableCard,
   fetchCard,
   fetchCardCashoutQuote,
+  fetchCardCashoutStatus,
   fetchCardOffers,
   fetchCardRechargeQuote,
+  fetchCardRechargeStatus,
   fetchCardTransactions,
   fetchCards,
   issueCard,
@@ -26,7 +28,8 @@ import {
   revealCard,
   suspendCard,
 } from "./endpoints";
-import { MAX_POLL_ATTEMPTS, POLL_INTERVAL_MS } from "./moneyHooks";
+import { MAX_POLL_ATTEMPTS, POLL_INTERVAL_MS, pollInterval } from "./moneyHooks";
+import { isCardOrderFinal } from "./status";
 import type {
   Card,
   CardCashout,
@@ -234,19 +237,43 @@ export function useRechargeCard(): UseMutationResult<
 }
 
 /**
- * Read a recharge result from the cache set by {@link useRechargeCard}. There is
- * no GET endpoint for a recharge, so the query never fetches — an absent result
- * (e.g. a hard refresh of the success URL) resolves to `undefined`, which the
- * screen renders as "receipt unavailable" rather than inventing one.
+ * Track a recharge to its final state, polling GET
+ * /api/cards/{uuid}/recharges/{ruuid} like the deposit flow. The mutation seeds
+ * the cache under {@link queryKeys.cardRecharge}, giving the initiating card
+ * UUID; the poll refetches until the state is final (or the attempt cap is
+ * reached) and then refreshes the wallet and card. On a hard refresh of the
+ * success URL there is no cached result and no card UUID to poll, so the query
+ * fails with a 404 the screen renders as "receipt unavailable" — never invented.
  */
-export function useCardRechargeResult(
+export function useCardRechargeStatus(
   uuid: string | null,
 ): UseQueryResult<CardRecharge, ApiError> {
+  const queryClient = useQueryClient();
   return useQuery<CardRecharge, ApiError>({
     queryKey: uuid ? queryKeys.cardRecharge(uuid) : ["card-recharges", "idle"],
-    queryFn: () =>
-      Promise.reject(new ApiError(404, "card_recharge_result_unavailable")),
-    enabled: false,
+    queryFn: async () => {
+      const cached = queryClient.getQueryData<CardRecharge>(
+        queryKeys.cardRecharge(uuid as string),
+      );
+      if (!cached?.card_uuid) {
+        throw new ApiError(404, "card_recharge_result_unavailable");
+      }
+      const fresh = await fetchCardRechargeStatus(cached.card_uuid, uuid as string);
+      if (isCardOrderFinal(fresh.state)) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.wallet });
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.card(cached.card_uuid),
+        });
+      }
+      return fresh;
+    },
+    enabled: uuid !== null,
+    refetchInterval: (query) =>
+      pollInterval(
+        query.state.dataUpdateCount,
+        query.state.data?.state,
+        isCardOrderFinal,
+      ),
   });
 }
 
@@ -290,15 +317,41 @@ export function useCashoutCard(): UseMutationResult<
   });
 }
 
-/** Read a cashout result from the cache set by {@link useCashoutCard}. */
-export function useCardCashoutResult(
+/**
+ * Track a cashout to its final state, polling GET
+ * /api/cards/{uuid}/cashouts/{cuuid}. Mirrors {@link useCardRechargeStatus}: the
+ * mutation seeds the cache, the poll refetches until final, then refreshes the
+ * wallet and card. No cached result on a hard refresh → 404 "unavailable".
+ */
+export function useCardCashoutStatus(
   uuid: string | null,
 ): UseQueryResult<CardCashout, ApiError> {
+  const queryClient = useQueryClient();
   return useQuery<CardCashout, ApiError>({
     queryKey: uuid ? queryKeys.cardCashout(uuid) : ["card-cashouts", "idle"],
-    queryFn: () =>
-      Promise.reject(new ApiError(404, "card_cashout_result_unavailable")),
-    enabled: false,
+    queryFn: async () => {
+      const cached = queryClient.getQueryData<CardCashout>(
+        queryKeys.cardCashout(uuid as string),
+      );
+      if (!cached?.card_uuid) {
+        throw new ApiError(404, "card_cashout_result_unavailable");
+      }
+      const fresh = await fetchCardCashoutStatus(cached.card_uuid, uuid as string);
+      if (isCardOrderFinal(fresh.state)) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.wallet });
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.card(cached.card_uuid),
+        });
+      }
+      return fresh;
+    },
+    enabled: uuid !== null,
+    refetchInterval: (query) =>
+      pollInterval(
+        query.state.dataUpdateCount,
+        query.state.data?.state,
+        isCardOrderFinal,
+      ),
   });
 }
 

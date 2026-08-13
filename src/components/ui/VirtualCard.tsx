@@ -10,6 +10,12 @@ interface VirtualCardProps {
   number?: string;
   holder?: string;
   expiry?: string;
+  /**
+   * Real card balance, pre-formatted for display (e.g. "125.00 USD"). Rendered
+   * on the full faces only. Omitted when the balance is not available, so the
+   * face never shows a fabricated amount.
+   */
+  balance?: string;
 }
 
 /**
@@ -109,6 +115,7 @@ export function VirtualCard({
   number = "•••• •••• •••• 4291",
   holder = "JEAN DUPONT",
   expiry = "12/28",
+  balance,
 }: VirtualCardProps) {
   if (size === "mini") {
     return (
@@ -156,11 +163,30 @@ export function VirtualCard({
         className="shadow-specular pointer-events-none absolute inset-0 rounded-lg"
       />
 
-      <FixPayLogo
-        tone="gold"
-        width={face.logoWidth}
-        className="relative opacity-[0.82]"
-      />
+      {/* Marque de l'émetteur, et le solde réel de la carte à sa droite : la
+          donnée que l'API expose désormais (CardResource.balance, USD). */}
+      <div className="relative flex items-start justify-between gap-3">
+        <FixPayLogo
+          tone="gold"
+          width={face.logoWidth}
+          className="opacity-[0.82]"
+        />
+        {balance ? (
+          <span className="text-right">
+            <span className={cn("block text-white/55", face.caption)}>
+              Solde
+            </span>
+            <span
+              className={cn(
+                "mt-[2px] block font-mono text-white/[0.92]",
+                face.value,
+              )}
+            >
+              {balance}
+            </span>
+          </span>
+        ) : null}
+      </div>
 
       {/* Trois blocs répartis par `justify-between` : marque en tête, numéro
           au centre optique, pied de face en bas. La face n'a plus une seule

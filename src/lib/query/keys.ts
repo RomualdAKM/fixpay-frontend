@@ -16,6 +16,7 @@ export const queryKeys = {
     ["cards", uuid, "cashout", "quote", amountUsdMinor] as const,
   cardRecharge: (uuid: string) => ["card-recharges", uuid] as const,
   cardCashout: (uuid: string) => ["card-cashouts", uuid] as const,
+  kyc: ["kyc"] as const,
   referral: ["referral"] as const,
   notifications: ["notifications"] as const,
   mobileMoneyAccounts: ["mobile-money-accounts"] as const,

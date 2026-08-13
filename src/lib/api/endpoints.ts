@@ -15,17 +15,21 @@ import type {
   RechargeCardInput,
   CreateWithdrawalInput,
   Deposit,
+  KycProfile,
   LinkMobileMoneyAccountInput,
   LoginInput,
   LoginResult,
   MobileMoneyAccount,
+  NotificationItem,
   NotificationList,
   Operator,
   OperatorPurpose,
   Paginated,
   PinTicket,
   Referral,
+  ReferralPayout,
   RegisterInput,
+  SubmitKycInput,
   User,
   VerifyPinInput,
   Wallet,
@@ -307,12 +311,91 @@ export function cancelCard(uuid: string): Promise<Card> {
   return apiFetch<Card>(`/cards/${uuid}/cancel`, { method: "POST" });
 }
 
+/** GET /api/cards/{uuid}/recharges/{ruuid} — poll a recharge until a final state. */
+export function fetchCardRechargeStatus(
+  uuid: string,
+  rechargeUuid: string,
+): Promise<CardRecharge> {
+  return apiFetch<CardRecharge>(`/cards/${uuid}/recharges/${rechargeUuid}`);
+}
+
+/** GET /api/cards/{uuid}/cashouts/{cuuid} — poll a cashout until a final state. */
+export function fetchCardCashoutStatus(
+  uuid: string,
+  cashoutUuid: string,
+): Promise<CardCashout> {
+  return apiFetch<CardCashout>(`/cards/${uuid}/cashouts/${cashoutUuid}`);
+}
+
+// ---- KYC ---------------------------------------------------------------
+
+/** GET /api/kyc — the current user's KYC profile status. */
+export function fetchKyc(): Promise<KycProfile> {
+  return apiFetch<KycProfile>("/kyc");
+}
+
+/** Build the multipart body POST /api/kyc expects (the three named files). */
+export function buildKycFormData(input: SubmitKycInput): FormData {
+  const form = new FormData();
+  form.append("id_front", input.id_front);
+  form.append("id_back", input.id_back);
+  form.append("selfie", input.selfie);
+  return form;
+}
+
+/**
+ * POST /api/kyc — submit the identity documents as multipart FormData. The
+ * status transitions to `pending`; the updated profile is returned.
+ */
+export function submitKyc(input: SubmitKycInput): Promise<KycProfile> {
+  return apiFetch<KycProfile>("/kyc", {
+    method: "POST",
+    body: buildKycFormData(input),
+  });
+}
+
+// ---- Referral ----------------------------------------------------------
+
+/** GET /api/referral — code, link, referees and the available commission balance. */
 export function fetchReferral(): Promise<Referral> {
   return apiFetch<Referral>("/referral");
 }
 
-export function fetchNotifications(): Promise<NotificationList> {
-  return apiFetch<NotificationList>("/notifications");
+/**
+ * POST /api/referral/payouts — sweep the available referral balance to the
+ * wallet. Guarded by `pin.ticket:referral_payout` (no amount bound), so the
+ * caller passes the `referral_payout` ticket.
+ */
+export function payoutReferral(pinTicket: string): Promise<ReferralPayout> {
+  return apiFetch<ReferralPayout>("/referral/payouts", {
+    method: "POST",
+    pinTicket,
+  });
+}
+
+// ---- Notifications -----------------------------------------------------
+
+/** GET /api/notifications — recent notifications and the unread count. */
+export function fetchNotifications(limit?: number): Promise<NotificationList> {
+  const query = limit ? `?limit=${limit}` : "";
+  return apiFetch<NotificationList>(`/notifications${query}`);
+}
+
+/** POST /api/notifications/{id}/read — mark one notification as read. */
+export function markNotificationRead(
+  id: string,
+): Promise<{ notification: NotificationItem }> {
+  return apiFetch<{ notification: NotificationItem }>(
+    `/notifications/${id}/read`,
+    { method: "POST" },
+  );
+}
+
+/** POST /api/notifications/read-all — mark every notification as read. */
+export function markAllNotificationsRead(): Promise<{ unread_count: number }> {
+  return apiFetch<{ unread_count: number }>("/notifications/read-all", {
+    method: "POST",
+  });
 }
 
 export function fetchMobileMoneyAccounts(): Promise<{

@@ -52,11 +52,13 @@ const CARD: Card = {
   uuid: "c1",
   status: "active",
   channel: "app",
+  brand: "Visa",
   pan_last4: "4291",
   expiry_month: 12,
   expiry_year: 2028,
   cardholder_name: "JEAN DUPONT",
   currency: "USD",
+  balance: usd(12_500),
   created_at: "2026-04-14T16:20:00+00:00",
 };
 

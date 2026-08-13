@@ -42,11 +42,13 @@ const ISSUED_CARD: Card = {
   uuid: "op-1",
   status: "active",
   channel: "app",
+  brand: "Visa",
   pan_last4: "4291",
   expiry_month: 12,
   expiry_year: 2028,
   cardholder_name: "JEAN DUPONT",
   currency: "USD",
+  balance: usd(0),
   created_at: "2026-04-14T16:20:00+00:00",
 };
 
@@ -123,14 +125,15 @@ describe("card recharge success gating", () => {
     expect(screen.queryByText("Carte alimentée")).not.toBeInTheDocument();
   });
 
-  it("shows a terminal « Reçu indisponible » (never a stuck spinner) when the cache is empty", () => {
-    // Régression : useCardRechargeResult est enabled:false et ne fetche JAMAIS.
-    // Un uuid présent sans résultat en cache (rechargement, URL rouverte) doit
-    // rendre l'état terminal, pas un spinner mort qui bloque l'écran.
+  it("resolves to « Reçu indisponible » when the cache is empty (no card UUID to poll)", async () => {
+    // Le poll a besoin de l'UUID de carte, présent seulement dans le cache
+    // écrit par la mutation. Sur un cache vide (rechargement, URL rouverte), le
+    // statut n'est pas interrogeable et l'écran se fige sur un état terminal.
     queryRef.current = "uuid=op-1";
     renderSeeded(<CardTopUpSuccessPage />, () => {});
-    expect(screen.getByText("Reçu indisponible")).toBeInTheDocument();
-    expect(document.querySelector(".animate-spin")).toBeNull();
+    await waitFor(() =>
+      expect(screen.getByText("Reçu indisponible")).toBeInTheDocument(),
+    );
   });
 });
 
@@ -152,10 +155,11 @@ describe("card cashout success gating", () => {
     expect(screen.queryByText("Retrait effectué")).not.toBeInTheDocument();
   });
 
-  it("shows a terminal « Reçu indisponible » (never a stuck spinner) when the cache is empty", () => {
+  it("resolves to « Reçu indisponible » when the cache is empty (no card UUID to poll)", async () => {
     queryRef.current = "uuid=op-1";
     renderSeeded(<CardWithdrawSuccessPage />, () => {});
-    expect(screen.getByText("Reçu indisponible")).toBeInTheDocument();
-    expect(document.querySelector(".animate-spin")).toBeNull();
+    await waitFor(() =>
+      expect(screen.getByText("Reçu indisponible")).toBeInTheDocument(),
+    );
   });
 });

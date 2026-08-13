@@ -35,8 +35,14 @@ export const testUser: User = {
   referral_code: "FP-JD2024",
   kyc_level: 1,
   status: "active",
+  pin_set: true,
   email_verified: true,
 };
+
+/** USD money helper (scale 2 — cents, two decimals) for card fixtures. */
+export function usd(amountMinor: number): Money {
+  return { amount_minor: amountMinor, currency: "USD", scale: 2 };
+}
 
 /**
  * Default handlers. /me defaults to 401 (guest) so tests opt into an

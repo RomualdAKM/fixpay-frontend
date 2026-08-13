@@ -10,9 +10,23 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { useTheme } from "@/components/theme/ThemeProvider";
 import { SettingsToggleRow } from "@/components/ui/SettingsToggleRow";
 import { MobileMoneyAccountsSection } from "@/components/wallet/MobileMoneyAccountsSection";
+import { useKyc } from "@/lib/api/accountHooks";
+import type { KycStatus } from "@/lib/api/types";
+import { useAuth } from "@/lib/auth";
 import { formatFcfa } from "@/lib/format";
-import { settingsOptions } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
+
+/** Défauts des préférences locales — appliquées sur l'appareil, jamais côté serveur. */
+const DEFAULT_LANGUE = "Français";
+const DEFAULT_DEVISE = "XOF — Franc CFA";
+
+/** Libellé lisible du statut KYC réel (GET /api/kyc). */
+const KYC_LABEL: Record<KycStatus, string> = {
+  none: "Non commencée",
+  pending: "En cours d'examen",
+  approved: "Vérifiée",
+  rejected: "À corriger",
+};
 
 /**
  * Options des selects. La devise d'affichage suit celle du compte : proposer
@@ -261,8 +275,10 @@ function StateFact({ label, value }: { label: string; value: string }) {
  */
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
-  const [langue, setLangue] = useState(settingsOptions.langue);
-  const [devise, setDevise] = useState(settingsOptions.devise);
+  const { user } = useAuth();
+  const kycQuery = useKyc();
+  const [langue, setLangue] = useState(DEFAULT_LANGUE);
+  const [devise, setDevise] = useState(DEFAULT_DEVISE);
   const [biometrics, setBiometrics] = useState(true);
   const [saved, setSaved] = useState(false);
   const savedTimer = useRef<number | null>(null);
@@ -344,14 +360,17 @@ export default function SettingsPage() {
               title="Sécurité"
               help={`Le code PIN est demandé à chaque paiement de plus de ${formatFcfa(PIN_THRESHOLD)}.`}
             />
-            {/* État de la sécurité : ces deux valeurs s'AFFICHENT, elles ne se
-                règlent pas depuis cet écran. Présentées en lignes tappables
-                sans destination, elles étaient deux affordances mortes ; en
-                repères d'état, elles disent ce qu'elles sont, et la ligne
-                d'action juste dessous mène là où la modification se fait. */}
+            {/* État réel de la sécurité : le code PIN est-il défini (GET /api/me).
+                Aucune date fabriquée. */}
             <dl className="border-border mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-b pb-4">
-              <StateFact label="Code PIN" value="Modifié le 12 mars" />
-              <StateFact label="Double authentification" value="Par SMS" />
+              <StateFact
+                label="Code PIN"
+                value={user?.pin_set ? "Défini" : "Non défini"}
+              />
+              <StateFact
+                label="Seuil PIN"
+                value={formatFcfa(PIN_THRESHOLD)}
+              />
             </dl>
             <div>
               <SettingsRow
@@ -374,23 +393,42 @@ export default function SettingsPage() {
 
           {/* ---- Colonne droite : ce qui décrit le compte ---- */}
           <div className="mt-12 lg:mt-0">
-            <SettingsSection title="Compte" />
-            <div className="mt-4">
+            <SettingsSection
+              title="Compte"
+              help="Vos informations et l'état de votre compte."
+            />
+            {/* Identité réelle (GET /api/me) : nom, e-mail et son statut de
+                vérification — jamais de valeur fabriquée. */}
+            <dl className="border-border mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-b pb-4">
+              <StateFact label="Nom" value={user?.name ?? "—"} />
+              <StateFact label="E-mail" value={user?.email ?? "—"} />
+              <StateFact
+                label="Adresse e-mail"
+                value={user?.email_verified ? "Vérifiée" : "Non vérifiée"}
+              />
+              <StateFact
+                label="Code PIN"
+                value={user?.pin_set ? "Défini" : "Non défini"}
+              />
+            </dl>
+            <div className="mt-2">
               <SettingsRow
                 title="Vérification d'identité"
-                value="1 étape sur 3"
+                value={
+                  kycQuery.data ? KYC_LABEL[kycQuery.data.status] : "Voir"
+                }
                 href="/profile/kyc"
                 divider
               />
               <SettingsRow
                 title="Notifications"
-                value="Push, e-mail"
+                value="Gérer"
                 href="/profile/notifications"
                 divider
               />
               <SettingsRow
                 title="Confidentialité"
-                value="2 consentements"
+                value="Gérer"
                 href="/profile/privacy"
               />
             </div>

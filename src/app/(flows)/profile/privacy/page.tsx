@@ -7,7 +7,7 @@ import { ChevronRight } from "lucide-react";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SettingsToggleRow } from "@/components/ui/SettingsToggleRow";
-import { user } from "@/lib/mock-data";
+import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 interface Device {
@@ -188,6 +188,8 @@ function SettingsActionRow({
  * peine plus que la hauteur d'une ligne.
  */
 export default function PrivacyPage() {
+  const { user } = useAuth();
+  const exportEmail = user?.email ?? "votre adresse";
   const [hideBalances, setHideBalances] = useState(false);
   const [hideAmountsInAlerts, setHideAmountsInAlerts] = useState(true);
   const [analytics, setAnalytics] = useState(false);
@@ -293,8 +295,8 @@ export default function PrivacyPage() {
             title="Exporter mes données"
             subtitle={
               exportRequested
-                ? `Demande enregistrée · archive envoyée à ${user.email} sous 48 h`
-                : `Archive JSON envoyée à ${user.email} sous 48 h`
+                ? `Demande enregistrée · archive envoyée à ${exportEmail} sous 48 h`
+                : `Archive JSON envoyée à ${exportEmail} sous 48 h`
             }
             action={exportRequested ? "Demandé" : "Demander"}
             onAction={

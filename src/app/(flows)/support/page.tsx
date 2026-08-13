@@ -104,8 +104,8 @@ const FAQ_ENTRIES: Record<string, { category: string; answer: string }> = {
 const EMERGENCIES = [
   {
     title: "Bloquer une carte",
-    subtitle: "Immédiat, depuis l'écran de la carte",
-    href: "/cards/visa-4291",
+    subtitle: "Choisissez la carte à geler depuis vos cartes",
+    href: "/cards",
   },
   {
     title: "Signaler une opération",

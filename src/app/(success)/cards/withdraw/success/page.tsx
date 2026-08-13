@@ -1,12 +1,12 @@
 "use client";
 
-import { ArrowDownLeft } from "lucide-react";
+import { ArrowDownLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 import type { ReceiptRow } from "@/components/ui/SuccessScreen";
 import { SuccessScreen } from "@/components/ui/SuccessScreen";
-import { useCardCashoutResult } from "@/lib/api/cardHooks";
+import { useCardCashoutStatus } from "@/lib/api/cardHooks";
 import { isCardOrderFinal } from "@/lib/api/status";
 import { formatDate, formatUsdFigure } from "@/lib/format";
 import { formatMoney } from "@/lib/money";
@@ -15,18 +15,27 @@ import { formatMoney } from "@/lib/money";
  * Écran 25 · Retrait carte → portefeuille — sur le résultat réel du cashout.
  *
  * Le reçu n'est composé QUE sur l'état final `success`. Le montant retiré (USD)
- * et le crédit reçu au portefeuille (XOF) viennent de la ressource. Sans
- * endpoint de statut, le résultat est lu dans le cache écrit par la mutation.
+ * et le crédit reçu au portefeuille (XOF) viennent de la ressource. L'état est
+ * POLLÉ (borné) sur GET /cards/{uuid}/cashouts/{cuuid} jusqu'à l'état final.
  */
 export default function CardWithdrawSuccessPage() {
   const uuid = useSearchParams().get("uuid");
-  const cashoutQuery = useCardCashoutResult(uuid);
+  const cashoutQuery = useCardCashoutStatus(uuid);
   const cashout = cashoutQuery.data;
 
-  // Le cashout n'a pas d'endpoint GET : le résultat n'existe qu'en cache, écrit
-  // par la mutation (useCardCashoutResult ne fetche jamais). Un uuid sans
-  // résultat en cache — rechargement, URL rouverte, retour restauré — est un
-  // état TERMINAL « reçu indisponible », pas un chargement.
+  if (cashoutQuery.isPending) {
+    return (
+      <main className="mx-auto flex min-h-dvh w-full max-w-[430px] flex-col items-center justify-center px-6 text-center">
+        <Loader2 size={28} className="text-primary animate-spin" aria-hidden />
+        <p className="text-text-muted mt-4 text-[13px] leading-[19px]">
+          Vérification du retrait…
+        </p>
+      </main>
+    );
+  }
+
+  // Pas de résultat en cache (rechargement, URL rouverte) : sans l'UUID de
+  // carte le statut n'est pas interrogeable — état TERMINAL « reçu indisponible ».
   if (!cashout) {
     return (
       <main className="mx-auto flex min-h-dvh w-full max-w-[430px] flex-col items-center justify-center px-6 text-center">

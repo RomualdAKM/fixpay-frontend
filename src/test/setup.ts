@@ -5,6 +5,22 @@ import { afterAll, afterEach, beforeAll } from "vitest";
 
 import { server } from "./msw/server";
 
+// jsdom ne fournit pas matchMedia : ThemeProvider s'en sert pour résoudre le
+// thème système. Un stub « pas de préférence » suffit et reste inerte.
+if (typeof window !== "undefined" && !window.matchMedia) {
+  window.matchMedia = (query: string): MediaQueryList =>
+    ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    }) as unknown as MediaQueryList;
+}
+
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 
 afterEach(() => {

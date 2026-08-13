@@ -13,6 +13,7 @@ import { StatusDot } from "@/components/ui/StatusDot";
 import { useCards } from "@/lib/api/cardHooks";
 import type { Card } from "@/lib/api/types";
 import { cardExpiry, cardStatusLabel, maskedPan } from "@/lib/cards";
+import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
 /** Couleur de pastille par statut : verte active, ambre gelée/en cours, rouge annulée. */
@@ -24,9 +25,9 @@ const STATUS_DOT: Record<Card["status"], string> = {
 };
 
 /**
- * Une rangée de carte, sur les données réelles de `CardResource`. Aucun solde :
- * l'API ne l'expose pas, et une rangée « carte » n'invente pas de montant. Le
- * numéro masqué (mono), le statut et l'échéance suffisent à l'identifier.
+ * Une rangée de carte, sur les données réelles de `CardResource`. Le solde réel
+ * (USD, exposé désormais par l'API) est en colonne droite ; le numéro masqué
+ * (mono), le statut et l'échéance identifient la carte.
  */
 function CardListRow({ card, last }: { card: Card; last: boolean }) {
   return (
@@ -49,6 +50,9 @@ function CardListRow({ card, last }: { card: Card; last: boolean }) {
           </span>
           Exp {cardExpiry(card)}
         </span>
+      </span>
+      <span className="text-text shrink-0 text-right font-mono text-[13px] leading-[17px] font-semibold">
+        {formatMoney(card.balance)}
       </span>
       <ChevronRight
         size={16}

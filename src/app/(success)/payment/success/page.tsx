@@ -15,8 +15,8 @@ export default function PaymentSuccessPage() {
     <OperationUnavailable
       title="Paiement indisponible"
       message="Le paiement par carte n'est pas encore raccordé. Aucun montant n'a été débité."
-      backHref="/cards/visa-4291"
-      backLabel="Retour à ma carte"
+      backHref="/cards"
+      backLabel="Retour à mes cartes"
     />
   );
 }
