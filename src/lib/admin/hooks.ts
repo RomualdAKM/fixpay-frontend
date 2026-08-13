@@ -408,8 +408,12 @@ export function useIssueMerchantKey(): UseMutationResult<
   ApiError,
   { uuid: string }
 > {
+  const queryClient = useQueryClient();
   return useMutation<IssuedApiKey, ApiError, { uuid: string }>({
     mutationFn: ({ uuid }) => admin.issueMerchantKey(uuid),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: adminKeys.merchants });
+    },
   });
 }
 
@@ -418,8 +422,12 @@ export function useRevokeMerchantKey(): UseMutationResult<
   ApiError,
   { uuid: string; keyUuid: string }
 > {
+  const queryClient = useQueryClient();
   return useMutation<B2bApiKey, ApiError, { uuid: string; keyUuid: string }>({
     mutationFn: ({ uuid, keyUuid }) => admin.revokeMerchantKey(uuid, keyUuid),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: adminKeys.merchants });
+    },
   });
 }
 

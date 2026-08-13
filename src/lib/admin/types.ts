@@ -359,14 +359,20 @@ export interface B2bMerchant {
   status: string;
   can_reveal_pan: boolean;
   webhook_url: string | null;
+  /** Merchant wallet balance (XOF, scale 0), sourced from the ledger. */
+  wallet_balance: Money;
+  /** The merchant's API keys — metadata only, NEVER a secret. */
+  api_keys: B2bApiKey[];
   created_at: string | null;
 }
 
 /** App\Http\Resources\B2bApiKeyResource — metadata only, never a secret. */
+export type B2bApiKeyStatus = "active" | "revoked";
+
 export interface B2bApiKey {
   uuid: string;
   public_key: string;
-  status: string;
+  status: B2bApiKeyStatus;
   last_used_at: string | null;
   expires_at: string | null;
   revoked_at: string | null;
