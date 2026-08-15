@@ -1,6 +1,11 @@
-import { QueryClient } from "@tanstack/react-query";
+import {
+  MutationCache,
+  QueryCache,
+  QueryClient,
+} from "@tanstack/react-query";
 
 import { ApiError } from "@/lib/api";
+import { queryKeys } from "@/lib/query/keys";
 
 /**
  * Build a QueryClient with product-wide defaults.
@@ -12,7 +17,21 @@ import { ApiError } from "@/lib/api";
  * turns it into the guest state. Other errors get a single retry.
  */
 export function createQueryClient(): QueryClient {
-  return new QueryClient({
+  const queryClient: QueryClient = new QueryClient({
+    queryCache: new QueryCache({
+      onError: (error) => {
+        if (error instanceof ApiError && error.status === 401) {
+          queryClient.setQueryData(queryKeys.me, null);
+        }
+      },
+    }),
+    mutationCache: new MutationCache({
+      onError: (error) => {
+        if (error instanceof ApiError && error.status === 401) {
+          queryClient.setQueryData(queryKeys.me, null);
+        }
+      },
+    }),
     defaultOptions: {
       queries: {
         staleTime: 30_000,
@@ -27,4 +46,5 @@ export function createQueryClient(): QueryClient {
       },
     },
   });
+  return queryClient;
 }

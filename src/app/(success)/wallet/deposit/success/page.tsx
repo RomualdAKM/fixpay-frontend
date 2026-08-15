@@ -32,14 +32,17 @@ export default function WalletDepositSuccessPage() {
 
   if (uuid === null) {
     return (
-      <SuccessScreen
-        icon={ArrowDownLeft}
-        title="Dépôt confirmé"
-        amount=""
-        currency="FCFA"
-        secondaryLabel="Nouveau dépôt"
-        secondaryHref="/wallet/deposit"
-      />
+      <main className="mx-auto flex min-h-dvh w-full max-w-[430px] flex-col items-center justify-center px-6 text-center">
+        <p className="text-text text-[16px] leading-[22px] font-semibold">
+          Reçu indisponible
+        </p>
+        <Link
+          href="/wallet"
+          className="text-primary-light mt-6 text-[13.5px] leading-[18px] font-medium underline-offset-4 hover:underline"
+        >
+          Retour au portefeuille
+        </Link>
+      </main>
     );
   }
 

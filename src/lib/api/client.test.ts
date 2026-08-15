@@ -142,14 +142,12 @@ describe("apiFetch", () => {
     expect(sentTicket).toBe("one-time-ticket");
   });
 
-  it("never writes the login token to storage", async () => {
+  it("never lets the login token reach application state", async () => {
     const result = await api.login({ email: "a@b.co", password: "x" });
 
-    // The token is on the wire...
-    expect(result.token).toBeTruthy();
-    // ...but nothing is persisted anywhere the JS can read it back.
+    expect(result).toEqual({ user: testUser });
+    expect(result).not.toHaveProperty("token");
     expect(localStorage.length).toBe(0);
     expect(sessionStorage.length).toBe(0);
-    expect(document.cookie).not.toContain(result.token);
   });
 });

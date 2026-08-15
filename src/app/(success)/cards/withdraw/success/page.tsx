@@ -23,7 +23,7 @@ export default function CardWithdrawSuccessPage() {
   const cashoutQuery = useCardCashoutStatus(uuid);
   const cashout = cashoutQuery.data;
 
-  if (cashoutQuery.isPending) {
+  if (uuid !== null && cashoutQuery.isPending) {
     return (
       <main className="mx-auto flex min-h-dvh w-full max-w-[430px] flex-col items-center justify-center px-6 text-center">
         <Loader2 size={28} className="text-primary animate-spin" aria-hidden />

@@ -1,6 +1,6 @@
 import { screen, waitFor } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { envelope, xof } from "@/test/msw/handlers";
 import { server } from "@/test/msw/server";
@@ -11,10 +11,14 @@ const BASE = "http://localhost:8000";
 // The success pages read the operation uuid from the query string. A stale or
 // hand-crafted link can point at a non-`success` uuid, so the pages must gate
 // the confirmed receipt on the real terminal status.
-const { uuidRef } = vi.hoisted(() => ({ uuidRef: { current: "op-1" } }));
+const { queryRef } = vi.hoisted(() => ({ queryRef: { current: "uuid=op-1" } }));
 vi.mock("next/navigation", () => ({
-  useSearchParams: () => new URLSearchParams(`uuid=${uuidRef.current}`),
+  useSearchParams: () => new URLSearchParams(queryRef.current),
 }));
+
+beforeEach(() => {
+  queryRef.current = "uuid=op-1";
+});
 
 import DepositSuccessPage from "@/app/(success)/wallet/deposit/success/page";
 import WithdrawSuccessPage from "@/app/(success)/wallet/withdraw/success/page";
@@ -110,5 +114,29 @@ describe("withdrawal success gating", () => {
     await waitFor(() =>
       expect(screen.getByText("Retrait envoyé")).toBeInTheDocument(),
     );
+  });
+});
+
+describe("success receipt gating on a missing uuid", () => {
+  it("never confirms a deposit when the uuid is absent from the URL", async () => {
+    queryRef.current = "";
+
+    renderWithClient(<DepositSuccessPage />);
+
+    await waitFor(() =>
+      expect(screen.getByText("Reçu indisponible")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("Dépôt confirmé")).not.toBeInTheDocument();
+  });
+
+  it("never confirms a withdrawal when the uuid is absent from the URL", async () => {
+    queryRef.current = "";
+
+    renderWithClient(<WithdrawSuccessPage />);
+
+    await waitFor(() =>
+      expect(screen.getByText("Reçu indisponible")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("Retrait envoyé")).not.toBeInTheDocument();
   });
 });

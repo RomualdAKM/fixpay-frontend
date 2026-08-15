@@ -52,8 +52,12 @@ export function register(input: RegisterInput): Promise<null> {
 }
 
 /** POST /api/login — `data: { token, user }`. The token is not persisted. */
-export function login(input: LoginInput): Promise<LoginResult> {
-  return apiFetch<LoginResult>("/login", { method: "POST", body: input });
+export async function login(input: LoginInput): Promise<LoginResult> {
+  const { user } = await apiFetch<{ token: string; user: User }>("/login", {
+    method: "POST",
+    body: input,
+  });
+  return { user };
 }
 
 /** POST /api/logout — invalidates the session/token. */

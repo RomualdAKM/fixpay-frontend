@@ -27,7 +27,7 @@ export default function CardTopUpSuccessPage() {
 
   // Premier aller-retour du poll : on attend le premier état réel plutôt que
   // d'afficher un reçu vide.
-  if (rechargeQuery.isPending) {
+  if (uuid !== null && rechargeQuery.isPending) {
     return (
       <main className="mx-auto flex min-h-dvh w-full max-w-[430px] flex-col items-center justify-center px-6 text-center">
         <Loader2 size={28} className="text-primary animate-spin" aria-hidden />

@@ -65,12 +65,6 @@ export interface User {
 
 /** POST /api/login `data`. */
 export interface LoginResult {
-  /**
-   * Sanctum personal-access token returned by the backend. In stateful SPA
-   * cookie mode this is intentionally IGNORED and never persisted (see
-   * docs and the auth foundation). Kept in the type only to describe the wire.
-   */
-  token: string;
   user: User;
 }
 
