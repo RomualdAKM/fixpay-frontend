@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { ListGroup } from "@/components/ui/ListGroup";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { StatusDot } from "@/components/ui/StatusDot";
+import { useNotifications } from "@/lib/api/accountHooks";
 import { useCards } from "@/lib/api/cardHooks";
 import type { Card } from "@/lib/api/types";
 import { cardExpiry, cardStatusLabel, maskedPan } from "@/lib/cards";
@@ -73,12 +74,19 @@ function CardListRow({ card, last }: { card: Card; last: boolean }) {
  */
 export default function CardsPage() {
   const cardsQuery = useCards();
+  const notificationsQuery = useNotifications();
   const cards = cardsQuery.data ?? [];
+  const hasUnread = (notificationsQuery.data?.unread_count ?? 0) > 0;
 
   return (
     <>
       <main className="flex-1 px-5 pt-[54px] pb-24 lg:mx-auto lg:w-full lg:max-w-[880px] lg:px-10 lg:pt-9 lg:pb-12">
-        <AppHeader title="Mes cartes" desktopTitle="Mes cartes" showBell />
+        <AppHeader
+          title="Mes cartes"
+          desktopTitle="Mes cartes"
+          showBell
+          bellDot={hasUnread}
+        />
 
         <div className="mt-6">
           <SectionHeader title="Cartes virtuelles" />

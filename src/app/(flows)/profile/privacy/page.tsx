@@ -2,40 +2,12 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ChevronRight } from "lucide-react";
 
 import { BottomNav } from "@/components/layout/BottomNav";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SettingsToggleRow } from "@/components/ui/SettingsToggleRow";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
-
-interface Device {
-  id: string;
-  name: string;
-  detail: string;
-  /** L'appareil courant ne peut pas être déconnecté depuis lui-même. */
-  current?: boolean;
-}
-
-const INITIAL_DEVICES: Device[] = [
-  {
-    id: "iphone-13",
-    name: "iPhone 13 · Abidjan",
-    detail: "Cet appareil · actif maintenant",
-    current: true,
-  },
-  {
-    id: "chrome-dakar",
-    name: "Chrome · Dakar",
-    detail: "Dernière activité le 11 avr.",
-  },
-  {
-    id: "chrome-abidjan",
-    name: "Chrome · Abidjan",
-    detail: "Dernière activité le 2 avr.",
-  },
-];
 
 /**
  * En-tête de section : le libellé seul ne dit pas ce que le réglage change.
@@ -72,108 +44,48 @@ function SettingsSection({
  * Ligne d'action de réglage. La hauteur est MINIMALE et non fixe : les copies
  * de la refonte tiennent sur deux lignes en mobile et débordaient la boîte de
  * 69px, écrasant le filet suivant. `gap`, `min-w-0` et `shrink-0` empêchent le
- * texte de venir toucher l'action.
- *
- * `actionTone` sépare deux natures d'action qui portaient le même bleu :
- * « Demander » un export (bénin, réversible) reste un lien, « Déconnecter »
- * un appareil (irréversible sur la session) devient un bouton bordé.
+ * texte de venir toucher l'état.
  */
 function SettingsActionRow({
   title,
   subtitle,
-  href,
-  action,
-  actionTone = "link",
-  onAction,
+  status,
   divider = false,
 }: {
   title: string;
   subtitle: string;
-  href?: string;
-  action?: string;
-  actionTone?: "link" | "outline";
-  onAction?: () => void;
+  status?: string;
   divider?: boolean;
 }) {
-  /*
-   * Le filet est porté par un CONTENEUR, jamais par la ligne interactive.
-   * Posé sur le <Link>, qui est arrondi (`rounded-sm` pour son anneau de
-   * focus), le `border-b` épouse le rayon et se recourbe vers le haut à ses
-   * deux extrémités : il cesse de se lire comme un séparateur pour se lire
-   * comme le bas d'une carte inachevée — c'est la seconde morphologie de
-   * séparateur relevée sur l'écran 16, produite par la même mécanique.
-   */
-  const rowClass =
-    "flex min-h-[69px] w-full items-start justify-between gap-4 py-[14px] text-left";
   const dividerClass = divider ? "border-border border-b" : undefined;
 
-  const body = (
-    <span className="min-w-0">
-      <span className="text-text block text-[14px] leading-[20px] font-medium">
-        {title}
-      </span>
-      <span className="text-text-muted mt-[2px] block text-[12px] leading-[16px]">
-        {subtitle}
-      </span>
-    </span>
-  );
-
-  if (href) {
-    return (
-      <div className={dividerClass}>
-        <Link
-          href={href}
-          className={cn(
-            rowClass,
-            "focus-visible:ring-primary/60 rounded-sm focus-visible:ring-2 focus-visible:outline-none",
-          )}
-        >
-          {body}
-          <ChevronRight
-            size={16}
-            strokeWidth={2}
-            absoluteStrokeWidth
-            aria-hidden="true"
-            className="text-icon-muted mt-[2px] shrink-0"
-          />
-        </Link>
-      </div>
-    );
-  }
-
   return (
-    <div className={cn(rowClass, dividerClass)}>
-      {body}
-      {action &&
-        (actionTone === "outline" ? (
-          <button
-            type="button"
-            onClick={onAction}
-            disabled={!onAction}
-            className="border-border bg-surface text-text-secondary hover:bg-surface-2 hover:text-text focus-visible:ring-primary/60 inline-flex h-8 shrink-0 items-center rounded-sm border px-3 text-[12px] font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-default"
-          >
-            {action}
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={onAction}
-            disabled={!onAction}
-            className={cn(
-              "inline-flex h-5 shrink-0 items-center text-[12.5px] font-medium disabled:cursor-default",
-              onAction ? "text-primary" : "text-text-muted",
-            )}
-          >
-            {action}
-          </button>
-        ))}
+    <div
+      className={cn(
+        "flex min-h-[69px] w-full items-start justify-between gap-4 py-[14px]",
+        dividerClass,
+      )}
+    >
+      <span className="min-w-0">
+        <span className="text-text block text-[14px] leading-[20px] font-medium">
+          {title}
+        </span>
+        <span className="text-text-muted mt-[2px] block text-[12px] leading-[16px]">
+          {subtitle}
+        </span>
+      </span>
+      {status && (
+        <span className="text-text-muted inline-flex h-5 shrink-0 items-center text-[12px] font-medium">
+          {status}
+        </span>
+      )}
     </div>
   );
 }
 
 /**
- * Écran 15 · Confidentialité — affichage, consentements datés, appareils
- * connectés, export et clôture de compte, mentions légales.
+ * Écran 15 · Confidentialité — affichage, consentements, export et clôture de
+ * compte, mentions légales.
  *
  * Recomposition post-audit : la structure à plat sur le fond est conservée
  * (c'était la bonne décision), mais le filet sous la DERNIÈRE ligne disparaît
@@ -189,17 +101,12 @@ function SettingsActionRow({
  */
 export default function PrivacyPage() {
   const { user } = useAuth();
-  const exportEmail = user?.email ?? "votre adresse";
   const [hideBalances, setHideBalances] = useState(false);
   const [hideAmountsInAlerts, setHideAmountsInAlerts] = useState(true);
   const [analytics, setAnalytics] = useState(false);
   const [marketing, setMarketing] = useState(false);
-  const [devices, setDevices] = useState<Device[]>(INITIAL_DEVICES);
-  const [exportRequested, setExportRequested] = useState(false);
   /** Confirmation de clôture — jamais destructive au premier clic. */
   const [closing, setClosing] = useState(false);
-
-  const otherDevices = devices.filter((device) => !device.current);
 
   return (
     <>
@@ -230,7 +137,7 @@ export default function PrivacyPage() {
         <SettingsSection
           className="mt-12"
           title="Consentements"
-          help="Recueillis le 5 avr. Vous pouvez revenir sur chacun de ces choix à tout moment ; un refus n'a aucun effet sur vos opérations."
+          help="Vous pouvez revenir sur chacun de ces choix à tout moment ; un refus n'a aucun effet sur vos opérations."
         />
         <div className="mt-4">
           {/* Opt-in par défaut à false, et le destinataire est nommé : le
@@ -252,37 +159,11 @@ export default function PrivacyPage() {
             checked={marketing}
             onChange={setMarketing}
           />
-        </div>
-
-        <SettingsSection
-          className="mt-12"
-          title="Appareils connectés"
-          help="Déconnectez tout appareil que vous ne reconnaissez pas : sa session est fermée immédiatement."
-        />
-        <div className="mt-4">
-          {devices.map((device, index) => (
-            <SettingsActionRow
-              key={device.id}
-              title={device.name}
-              subtitle={device.detail}
-              action={device.current ? undefined : "Déconnecter"}
-              actionTone="outline"
-              onAction={
-                device.current
-                  ? undefined
-                  : () =>
-                      setDevices((prev) =>
-                        prev.filter((item) => item.id !== device.id),
-                      )
-              }
-              divider={index < devices.length - 1}
-            />
-          ))}
-          {otherDevices.length === 0 && (
-            <p className="text-text-muted py-4 text-[12.5px] leading-[18px]">
-              Aucun autre appareil n&apos;est connecté à votre compte.
-            </p>
-          )}
+          <p className="text-text-muted mt-4 text-[11.5px] leading-[17px]">
+            L&apos;affichage et les consentements ci-dessus ne sont pas encore
+            reliés à votre compte : ces choix ne sont pas conservés d&apos;une
+            session à l&apos;autre.
+          </p>
         </div>
 
         <SettingsSection
@@ -294,22 +175,14 @@ export default function PrivacyPage() {
           <SettingsActionRow
             title="Exporter mes données"
             subtitle={
-              exportRequested
-                ? `Demande enregistrée · archive envoyée à ${exportEmail} sous 48 h`
-                : `Archive JSON envoyée à ${exportEmail} sous 48 h`
+              user?.email
+                ? `L'archive sera envoyée à ${user.email}`
+                : "L'archive vous sera envoyée par e-mail"
             }
-            action={exportRequested ? "Demandé" : "Demander"}
-            onAction={
-              exportRequested ? undefined : () => setExportRequested(true)
-            }
+            status="Bientôt disponible"
             divider
           />
 
-          {/* Clôture de compte : l'action la plus destructive du produit était
-              une ligne de navigation neutre à chevron, strictement identique à
-              « Exporter mes données », et sans confirmation. Elle porte
-              désormais son registre (danger) et une confirmation explicite qui
-              énonce les conséquences avant de renvoyer vers l'assistance. */}
           <div className="min-h-[69px] py-[14px]">
             <div className="flex items-start justify-between gap-4">
               <span className="min-w-0">

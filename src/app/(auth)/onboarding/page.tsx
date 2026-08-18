@@ -1,12 +1,10 @@
 import Link from "next/link";
 import { Fragment } from "react";
-import { ChevronDown } from "lucide-react";
 
 import { FixPayLogo } from "@/components/brand/FixPayLogo";
 import { Button } from "@/components/ui/Button";
 import { VirtualCard } from "@/components/ui/VirtualCard";
 import { formatFcfa } from "@/lib/format";
-import { cards } from "@/lib/mock-data";
 
 export const metadata = { title: "Onboarding" };
 
@@ -31,10 +29,13 @@ const RAILS = ["Orange Money", "Wave", "MTN"];
  * est celui qu'annonce la FAQ de l'écran 26. Une promesse commerciale et son
  * coût sont donc lus dans le même viewport, avant le bouton, et pas après.
  */
+const CARD_ISSUANCE_FEE = 3_000;
+const CARD_MONTHLY_LIMIT = 500_000;
+
 const FACTS = [
-  { label: "Émission", value: formatFcfa(3000) },
+  { label: "Émission", value: formatFcfa(CARD_ISSUANCE_FEE) },
   { label: "Délai", value: "sous 5 min" },
-  { label: "Plafond mensuel", value: formatFcfa(cards[0]!.monthlyLimit) },
+  { label: "Plafond mensuel", value: formatFcfa(CARD_MONTHLY_LIMIT) },
 ];
 
 /**
@@ -108,19 +109,9 @@ export default function OnboardingPage() {
               La carte virtuelle en FCFA
             </p>
           </div>
-          <button
-            type="button"
-            className="border-border text-text-secondary hover:bg-surface inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] leading-[16px] transition-colors lg:px-3.5 lg:py-2 lg:text-[13px]"
-          >
+          <span className="border-border text-text-secondary inline-flex shrink-0 items-center rounded-full border px-3 py-1.5 text-[12px] leading-[16px] lg:px-3.5 lg:py-2 lg:text-[13px]">
             Sénégal · Français
-            <ChevronDown
-              size={13}
-              strokeWidth={1.5}
-              absoluteStrokeWidth
-              className="text-icon-muted"
-              aria-hidden
-            />
-          </button>
+          </span>
         </header>
 
         {/* Hero : sur desktop, discours à gauche, carte à droite, centrés dans
@@ -211,21 +202,8 @@ export default function OnboardingPage() {
                   Elle grandit elle aussi en desktop : à 11px elle était à la
                   limite du lisible sur 1440 de large. */}
               <p className="text-text-secondary mt-4 max-w-[340px] text-[12px] leading-[18px] lg:max-w-[470px] lg:text-[13px] lg:leading-[20px]">
-                En continuant, vous acceptez nos{" "}
-                <Link
-                  href="/"
-                  className="text-primary-light underline-offset-4 hover:underline"
-                >
-                  Conditions générales
-                </Link>{" "}
-                et notre{" "}
-                <Link
-                  href="/"
-                  className="text-primary-light underline-offset-4 hover:underline"
-                >
-                  Politique de confidentialité
-                </Link>
-                .
+                En continuant, vous acceptez nos Conditions générales et notre
+                Politique de confidentialité.
               </p>
             </div>
           </div>

@@ -3,7 +3,7 @@ import type { CSSProperties, ReactNode } from "react";
 
 import { AmountFigure, AmountText } from "@/components/ui/AmountText";
 import { formatSigned } from "@/lib/format";
-import type { Transaction } from "@/lib/mock-data";
+import type { Transaction } from "@/lib/display-types";
 import { cn } from "@/lib/utils";
 
 interface TransactionItemProps {

@@ -215,7 +215,7 @@ export default function NotificationsSettingsPage() {
         <div className="mt-4">
           <SettingsToggleRow
             title="Notifications push"
-            subtitle="Cet appareil · iPhone de Jean"
+            subtitle="Alertes directement sur cet appareil"
             checked={push}
             onChange={setPush}
             divider
@@ -229,14 +229,14 @@ export default function NotificationsSettingsPage() {
           />
           <SettingsToggleRow
             title="SMS promotionnels"
-            subtitle="Offres FixPay au +225 07 •• •• 41"
+            subtitle="Offres et nouveautés FixPay par SMS"
             checked={marketingSms}
             onChange={setMarketingSms}
             divider
           />
           <RequiredSettingRow
             title="Codes de confirmation"
-            subtitle="Toujours envoyés par SMS au +225 07 •• •• 41"
+            subtitle="Toujours envoyés par SMS pour valider vos opérations"
           />
 
           {/* La conséquence d'un réglage appartient à SON groupe : l'avertis-
@@ -267,7 +267,8 @@ export default function NotificationsSettingsPage() {
         </div>
 
         <p className="text-text-muted mt-12 text-[11.5px] leading-[17px]">
-          Chaque modification est appliquée immédiatement, sans validation.
+          Le réglage des notifications n&apos;est pas encore relié à votre
+          compte : ces préférences arriveront bientôt.
         </p>
       </main>
 

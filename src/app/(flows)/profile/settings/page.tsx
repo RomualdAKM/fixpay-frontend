@@ -8,17 +8,13 @@ import { LogoutButton } from "@/components/auth/LogoutButton";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useTheme } from "@/components/theme/ThemeProvider";
-import { SettingsToggleRow } from "@/components/ui/SettingsToggleRow";
 import { MobileMoneyAccountsSection } from "@/components/wallet/MobileMoneyAccountsSection";
 import { useKyc } from "@/lib/api/accountHooks";
 import type { KycStatus } from "@/lib/api/types";
 import { useAuth } from "@/lib/auth";
 import { formatFcfa } from "@/lib/format";
 import { cn } from "@/lib/utils";
-
-/** Défauts des préférences locales — appliquées sur l'appareil, jamais côté serveur. */
-const DEFAULT_LANGUE = "Français";
-const DEFAULT_DEVISE = "XOF — Franc CFA";
+import { APP_VERSION } from "@/lib/version";
 
 /** Libellé lisible du statut KYC réel (GET /api/kyc). */
 const KYC_LABEL: Record<KycStatus, string> = {
@@ -28,17 +24,6 @@ const KYC_LABEL: Record<KycStatus, string> = {
   rejected: "À corriger",
 };
 
-/**
- * Options des selects. La devise d'affichage suit celle du compte : proposer
- * l'euro en premier dans une application qui compte en FCFA était la trace la
- * plus nette du gabarit de fintech européenne (audit, écran 16).
- */
-const LANGUE_OPTIONS: string[] = ["Français", "English"];
-const DEVISE_OPTIONS: string[] = [
-  "XOF — Franc CFA",
-  "EUR — Euro",
-  "USD — Dollar",
-];
 const THEME_OPTIONS: string[] = ["Sombre", "Clair"];
 
 /** Plafond au-delà duquel le code PIN est exigé. */
@@ -277,9 +262,6 @@ export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
   const { user } = useAuth();
   const kycQuery = useKyc();
-  const [langue, setLangue] = useState(DEFAULT_LANGUE);
-  const [devise, setDevise] = useState(DEFAULT_DEVISE);
-  const [biometrics, setBiometrics] = useState(true);
   const [saved, setSaved] = useState(false);
   const savedTimer = useRef<number | null>(null);
 
@@ -325,26 +307,6 @@ export default function SettingsPage() {
             />
             <div className="mt-4">
               <SettingsSelectRow
-                title="Langue"
-                value={langue}
-                options={LANGUE_OPTIONS}
-                onChange={(value) => {
-                  setLangue(value);
-                  acknowledge();
-                }}
-                divider
-              />
-              <SettingsSelectRow
-                title="Devise d'affichage"
-                value={devise}
-                options={DEVISE_OPTIONS}
-                onChange={(value) => {
-                  setDevise(value);
-                  acknowledge();
-                }}
-                divider
-              />
-              <SettingsSelectRow
                 title="Thème"
                 value={theme === "light" ? "Clair" : "Sombre"}
                 options={THEME_OPTIONS}
@@ -379,14 +341,9 @@ export default function SettingsPage() {
                 href="/support"
                 divider
               />
-              <SettingsToggleRow
+              <SettingsRow
                 title="Déverrouillage biométrique"
-                subtitle="Ouvrir FixPay avec l'empreinte de cet appareil"
-                checked={biometrics}
-                onChange={(value) => {
-                  setBiometrics(value);
-                  acknowledge();
-                }}
+                value="Bientôt disponible"
               />
             </div>
           </div>
@@ -444,7 +401,7 @@ export default function SettingsPage() {
             <div className="mt-4">
               <SettingsRow
                 title="Version de l'application"
-                value="1.4.0 (812)"
+                value={APP_VERSION}
                 divider
               />
               <SettingsRow

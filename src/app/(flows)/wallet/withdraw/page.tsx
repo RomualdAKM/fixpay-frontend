@@ -37,6 +37,8 @@ const FLOW_ASIDE = "mt-8 lg:mt-0";
 
 const MIN_AMOUNT_FCFA = 200;
 
+const PAYOUT_DELAY_LABEL = "Sous 5 min";
+
 const STEP_LABELS = ["Pays", "Opérateur", "Bénéficiaire", "Montant"] as const;
 
 function parseAmount(raw: string): number {
@@ -557,7 +559,7 @@ export default function WalletWithdrawPage() {
                   <div className="mt-3">
                     <TransactionFacts
                       fee={formatMoney(quote.fixpay_fee)}
-                      delay="Sous 5 min"
+                      delay={PAYOUT_DELAY_LABEL}
                       balanceAfter={balanceAfter}
                     />
                     <div className="border-border mt-3.5 flex items-baseline justify-between border-t pt-3.5">

@@ -11,7 +11,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import type { AppNotification, TxIcon } from "@/lib/mock-data";
+import type { AppNotification, TxIcon } from "@/lib/display-types";
 
 /**
  * Maps a transaction icon key to its lucide icon (screens 02, 03, 10).

@@ -21,13 +21,14 @@ import { BottomNav } from "@/components/layout/BottomNav";
 import { InlineError } from "@/components/feedback/InlineError";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { StatusDot } from "@/components/ui/StatusDot";
-import { useKyc } from "@/lib/api/accountHooks";
+import { useKyc, useNotifications } from "@/lib/api/accountHooks";
 import { useCards } from "@/lib/api/cardHooks";
 import type { Card, KycStatus } from "@/lib/api/types";
 import { useAuth } from "@/lib/auth";
 import { cardExpiry, cardStatusLabel, maskedPan } from "@/lib/cards";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { APP_VERSION } from "@/lib/version";
 
 /** Première lettre du nom pour l'avatar (donnée dérivée, jamais fabriquée). */
 function initialOf(name: string): string {
@@ -136,7 +137,9 @@ export default function ProfilePage() {
   const { user } = useAuth();
   const kycQuery = useKyc();
   const cardsQuery = useCards();
+  const notificationsQuery = useNotifications();
   const cards = cardsQuery.data ?? [];
+  const hasUnread = (notificationsQuery.data?.unread_count ?? 0) > 0;
 
   const kycStatus = kycQuery.data?.status;
   const banner =
@@ -145,7 +148,7 @@ export default function ProfilePage() {
   return (
     <>
       <main className="flex-1 px-5 pt-[52px] pb-24 lg:mx-auto lg:w-full lg:max-w-[1080px] lg:px-10 lg:pt-9 lg:pb-12">
-        <AppHeader title="Profil" bellDot desktopTitle="Profil" />
+        <AppHeader title="Profil" bellDot={hasUnread} desktopTitle="Profil" />
 
         <div className="contents lg:mt-8 lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-8">
           {/* ---- Colonne A ---- */}
@@ -350,7 +353,7 @@ export default function ProfilePage() {
               Paramètres et déconnexion
             </Link>
             <p className="text-text-muted mt-3 text-[11px] leading-[15px] lg:mt-0">
-              CGU · Confidentialité · v1.4.2
+              CGU · Confidentialité · v{APP_VERSION}
             </p>
           </div>
         </div>

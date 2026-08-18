@@ -14,17 +14,21 @@ import {
   WalletHeroActions,
   WalletHeroCard,
 } from "@/components/ui/WalletHeroCard";
-import { useKyc } from "@/lib/api/accountHooks";
+import { useKyc, useNotifications } from "@/lib/api/accountHooks";
 import { useCards } from "@/lib/api/cardHooks";
 import type { CardStatus, KycStatus } from "@/lib/api/types";
 import { useWallet, useWalletTransactions } from "@/lib/api/moneyHooks";
 import { walletTransactionToRow } from "@/lib/api/presenters";
 import { cardExpiry, cardStatusLabel, maskedPan } from "@/lib/cards";
 import { formatMoney } from "@/lib/money";
-import { depositFacts, withdrawFacts } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
 const MASKED_BALANCE = "••••••";
+
+const HOME_TARIFF = {
+  deposit: { feeLabel: "Gratuit", delay: "Sous 2 min" },
+  withdraw: { feeLabel: "1 % (min. 100 FCFA)", delay: "Sous 5 min" },
+} as const;
 
 const STATUS_DOT: Record<CardStatus, string> = {
   active: "bg-success",
@@ -92,7 +96,9 @@ export default function HomePage() {
   const txQuery = useWalletTransactions();
   const kycQuery = useKyc();
   const cardsQuery = useCards();
+  const notificationsQuery = useNotifications();
   const cards = cardsQuery.data ?? [];
+  const hasUnread = (notificationsQuery.data?.unread_count ?? 0) > 0;
 
   const kycStatus = kycQuery.data?.status;
   const kycInfo =
@@ -111,7 +117,7 @@ export default function HomePage() {
   return (
     <>
       <main className="px-5 pt-[50px] pb-24 lg:mx-auto lg:w-full lg:max-w-[1080px] lg:px-10 lg:pt-9 lg:pb-12">
-        <AppHeader showLogo bellDot desktopTitle="Accueil" />
+        <AppHeader showLogo bellDot={hasUnread} desktopTitle="Accueil" />
 
         <div className="flex flex-col lg:mt-8 lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-8">
           {/* Colonne A — argent : solde, vérification, cartes */}
@@ -144,14 +150,15 @@ export default function HomePage() {
               )}
             </div>
 
-            {/* LE COÛT DES DEUX ACTIONS, sous les deux actions. Les valeurs
-                sortent des mêmes objets de barème que les écrans 04 et 05 : le
-                prix annoncé sur le tableau de bord est exactement celui du
-                tunnel. C'est un tarif produit, pas une donnée de compte. */}
+            {/* LE COÛT DES DEUX ACTIONS, sous les deux actions. Tarif produit
+                du dépôt et du retrait Mobile Money (constante nommée locale,
+                faute d'endpoint de barème sur cet écran), pas une donnée de
+                compte. */}
             <p className="text-text-muted mt-2 text-[12px] leading-[17px]">
-              Dépôt&nbsp;: {depositFacts.feeLabel.toLowerCase()}, crédité{" "}
-              {depositFacts.delay.toLowerCase()} · Retrait&nbsp;:{" "}
-              {withdrawFacts.feeLabel}, {withdrawFacts.delay.toLowerCase()}
+              Dépôt&nbsp;: {HOME_TARIFF.deposit.feeLabel.toLowerCase()}, crédité{" "}
+              {HOME_TARIFF.deposit.delay.toLowerCase()} · Retrait&nbsp;:{" "}
+              {HOME_TARIFF.withdraw.feeLabel},{" "}
+              {HOME_TARIFF.withdraw.delay.toLowerCase()}
             </p>
 
             {/* CE QUI EXPLIQUE LES PLAFONDS, piloté par le vrai statut KYC :

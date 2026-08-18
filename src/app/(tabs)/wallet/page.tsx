@@ -10,6 +10,7 @@ import { InlineError } from "@/components/feedback/InlineError";
 import { AmountFigure } from "@/components/ui/AmountText";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { WalletMovements } from "@/components/ui/WalletMovements";
+import { useNotifications } from "@/lib/api/accountHooks";
 import {
   useMobileMoneyAccounts,
   useWallet,
@@ -77,6 +78,8 @@ export default function WalletPage() {
   const walletQuery = useWallet();
   const accountsQuery = useMobileMoneyAccounts();
   const txQuery = useWalletTransactions();
+  const notificationsQuery = useNotifications();
+  const hasUnread = (notificationsQuery.data?.unread_count ?? 0) > 0;
 
   const { figure, currency } = walletQuery.data
     ? splitAmountCurrency(formatMoney(walletQuery.data.balance))
@@ -97,7 +100,7 @@ export default function WalletPage() {
       <main className="flex-1 px-5 pt-[52px] pb-24 lg:mx-auto lg:w-full lg:max-w-[1080px] lg:px-10 lg:pt-9 lg:pb-12">
         <AppHeader
           title="Mon portefeuille"
-          bellDot
+          bellDot={hasUnread}
           desktopTitle="Mon portefeuille"
         />
 

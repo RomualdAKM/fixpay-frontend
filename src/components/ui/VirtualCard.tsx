@@ -112,9 +112,9 @@ function BrandMark({
 export function VirtualCard({
   size = "lg",
   brand = "visa",
-  number = "•••• •••• •••• 4291",
-  holder = "JEAN DUPONT",
-  expiry = "12/28",
+  number = "•••• •••• •••• ••••",
+  holder = "",
+  expiry = "••/••",
   balance,
 }: VirtualCardProps) {
   if (size === "mini") {

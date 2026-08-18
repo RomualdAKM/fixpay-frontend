@@ -1,6 +1,6 @@
 import { InlineError } from "@/components/feedback/InlineError";
 import { TransactionItem } from "@/components/ui/TransactionItem";
-import type { Transaction } from "@/lib/mock-data";
+import type { Transaction } from "@/lib/display-types";
 
 interface WalletMovementsProps {
   rows: Transaction[];

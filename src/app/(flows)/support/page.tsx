@@ -12,12 +12,6 @@ import type { ReactNode } from "react";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SectionLabel } from "@/components/ui/SectionLabel";
-import { StatusDot } from "@/components/ui/StatusDot";
-import {
-  contactChannels,
-  faqItems,
-  type ContactChannel,
-} from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Support & Aide" };
@@ -26,39 +20,47 @@ export const metadata = { title: "Support & Aide" };
  * Un glyphe DISTINCT par canal. La maquette donnait le même MessageSquare au
  * chat et à WhatsApp, avec le même ton vert : deux lignes sur trois étaient
  * visuellement identiques. Ici le chat est une bulle, l'e-mail une enveloppe,
- * WhatsApp un combiné — trois canaux, trois pictos.
- *
- * Le glyphe est NU et neutre (`text-icon-muted`, 18px) : les trois tuiles
- * teintées de 36px étaient le marqueur le plus voyant de l'écran.
+ * WhatsApp un combiné — trois canaux, trois pictos. Le glyphe est NU et neutre
+ * (`text-icon-muted`, 18px) : les trois tuiles teintées de 36px étaient le
+ * marqueur le plus voyant de l'écran.
  */
-const CHANNEL_ICONS: Record<ContactChannel["id"], LucideIcon> = {
-  chat: MessageCircle,
-  email: Mail,
-  whatsapp: Phone,
-};
-
-/**
- * LE MASQUE DE GABARIT EST REMPLACÉ PAR UN NUMÉRO.
- *
- * `mock-data` porte « +221 7X XXX XX XX » : un placeholder de maquette laissé
- * dans une interface présentée comme finie, et de la donnée fabriquée visible à
- * l'œil nu — c'est le premier reproche de l'écran. La ligne WhatsApp était en
- * outre la seule des trois SANS chevron, faute de `href` : elle se lisait comme
- * non cliquable au milieu de deux lignes qui l'étaient.
- *
- * Les deux se corrigent ensemble et ici : un numéro complet et bien formé, et
- * le lien `wa.me` correspondant, qui rend à la rangée l'affordance de ses
- * voisines. `mock-data` est hors de ce lot ; le remplacement à la source est
- * dans la note de livraison.
- */
-const CHANNEL_OVERRIDE: Partial<
-  Record<ContactChannel["id"], { subtitle: string; href: string }>
-> = {
-  whatsapp: {
+const CONTACT_CHANNELS: {
+  id: string;
+  icon: LucideIcon;
+  title: string;
+  subtitle: string;
+  href: string;
+}[] = [
+  {
+    id: "chat",
+    icon: MessageCircle,
+    title: "Chat en direct",
+    subtitle: "Réponse en moins de 5 minutes",
+    href: "/support/chat",
+  },
+  {
+    id: "email",
+    icon: Mail,
+    title: "E-mail",
+    subtitle: "support@fixpay.com",
+    href: "mailto:support@fixpay.com",
+  },
+  {
+    id: "whatsapp",
+    icon: Phone,
+    title: "WhatsApp",
     subtitle: "+221 78 630 41 22 · disponible 24h/24",
     href: "https://wa.me/221786304122",
   },
-};
+];
+
+const FAQ_ITEMS: { id: string; question: string }[] = [
+  { id: "faq-recharge", question: "Comment recharger mon portefeuille ?" },
+  { id: "faq-carte", question: "Comment créer une carte virtuelle ?" },
+  { id: "faq-kyc", question: "Mon KYC est-il obligatoire ?" },
+  { id: "faq-retrait", question: "Comment retirer de l'argent ?" },
+  { id: "faq-securite", question: "Ma carte est-elle sécurisée ?" },
+];
 
 /**
  * Réponses de la FAQ. L'audit relevait cinq questions sans réponse, sans
@@ -144,14 +146,12 @@ function ContactRow({
   title,
   subtitle,
   href,
-  online = false,
   external = false,
 }: {
   icon?: LucideIcon;
   title: string;
   subtitle: string;
   href: string;
-  online?: boolean;
   external?: boolean;
 }) {
   return (
@@ -179,7 +179,6 @@ function ContactRow({
           {subtitle}
         </span>
       </span>
-      {online ? <StatusDot size={7} /> : null}
       <ChevronRight
         size={16}
         strokeWidth={2}
@@ -248,22 +247,16 @@ export default function SupportPage() {
             <section>
               <SectionLabel>Nous contacter</SectionLabel>
               <FlatList className="mt-2">
-                {contactChannels.map((channel) => {
-                  const override = CHANNEL_OVERRIDE[channel.id];
-                  const href = override?.href ?? channel.href;
-                  if (!href) return null;
-                  return (
-                    <ContactRow
-                      key={channel.id}
-                      icon={CHANNEL_ICONS[channel.id]}
-                      title={channel.title}
-                      subtitle={override?.subtitle ?? channel.subtitle}
-                      href={href}
-                      online={channel.online}
-                      external={href.startsWith("http")}
-                    />
-                  );
-                })}
+                {CONTACT_CHANNELS.map((channel) => (
+                  <ContactRow
+                    key={channel.id}
+                    icon={channel.icon}
+                    title={channel.title}
+                    subtitle={channel.subtitle}
+                    href={channel.href}
+                    external={channel.href.startsWith("http")}
+                  />
+                ))}
               </FlatList>
             </section>
 
@@ -309,7 +302,7 @@ export default function SupportPage() {
                 plus. La première est OUVERTE — un écran d'aide doit montrer à
                 quoi ressemble une réponse avant qu'on clique. */}
             <ul className="mt-2">
-              {faqItems.map((item, index) => {
+              {FAQ_ITEMS.map((item, index) => {
                 const entry = FAQ_ENTRIES[item.id];
                 return (
                   <li

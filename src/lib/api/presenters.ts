@@ -1,5 +1,5 @@
 import { formatDate } from "@/lib/format";
-import type { Transaction, TxIcon } from "@/lib/mock-data";
+import type { Transaction, TxIcon } from "@/lib/display-types";
 import { majorUnits } from "@/lib/money";
 
 import type { WalletTransaction } from "./types";

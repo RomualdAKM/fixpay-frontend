@@ -1,4 +1,4 @@
-import type { Transaction } from "@/lib/mock-data";
+import type { Transaction } from "@/lib/display-types";
 
 /**
  * Formatting helpers for amounts and dates.
