@@ -29,6 +29,7 @@ import type {
   Referral,
   ReferralPayout,
   RegisterInput,
+  ResetPasswordInput,
   SubmitKycInput,
   User,
   VerifyPinInput,
@@ -73,6 +74,20 @@ export function fetchMe(): Promise<User> {
 /** POST /api/email/verification-notification — resend the verification link. */
 export function resendVerificationEmail(): Promise<null> {
   return apiFetch<null>("/email/verification-notification", { method: "POST" });
+}
+
+/**
+ * POST /api/forgot-password — request a reset link. The backend ALWAYS answers
+ * neutrally (anti-enumeration), so this never reveals whether the address is
+ * registered; the caller shows the same confirmation either way.
+ */
+export function forgotPassword(email: string): Promise<null> {
+  return apiFetch<null>("/forgot-password", { method: "POST", body: { email } });
+}
+
+/** POST /api/reset-password — set a new password from the emailed token. */
+export function resetPassword(input: ResetPasswordInput): Promise<null> {
+  return apiFetch<null>("/reset-password", { method: "POST", body: input });
 }
 
 // ---- PIN ---------------------------------------------------------------

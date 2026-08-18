@@ -470,3 +470,10 @@ export interface LoginInput {
   email: string;
   password: string;
 }
+
+/** Input for POST /api/reset-password (ResetPasswordRequest). */
+export interface ResetPasswordInput {
+  token: string;
+  email: string;
+  password: string;
+}

@@ -13,9 +13,11 @@ import { queryKeys } from "@/lib/query/keys";
 import { ApiError } from "./ApiError";
 import {
   fetchMe,
+  forgotPassword,
   login,
   logout,
   register,
+  resetPassword,
   setPin,
   verifyPin,
 } from "./endpoints";
@@ -24,6 +26,7 @@ import type {
   LoginResult,
   PinTicket,
   RegisterInput,
+  ResetPasswordInput,
   User,
   VerifyPinInput,
 } from "./types";
@@ -84,6 +87,28 @@ export function useLogout(): UseMutationResult<null, ApiError, void> {
       queryClient.setQueryData(queryKeys.me, null);
       queryClient.clear();
     },
+  });
+}
+
+/**
+ * POST /api/forgot-password. The backend answers neutrally whether or not the
+ * address exists, so success here never confirms an account — the UI shows the
+ * same confirmation regardless.
+ */
+export function useForgotPassword(): UseMutationResult<null, ApiError, string> {
+  return useMutation<null, ApiError, string>({
+    mutationFn: (email) => forgotPassword(email),
+  });
+}
+
+/** POST /api/reset-password — set a new password from the emailed token. */
+export function useResetPassword(): UseMutationResult<
+  null,
+  ApiError,
+  ResetPasswordInput
+> {
+  return useMutation<null, ApiError, ResetPasswordInput>({
+    mutationFn: (input) => resetPassword(input),
   });
 }
 

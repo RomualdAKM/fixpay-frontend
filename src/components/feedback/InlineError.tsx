@@ -41,6 +41,8 @@ const CODE_MESSAGES: Record<string, string> = {
   pin_not_configured: "Définissez d'abord votre code PIN dans Paramètres.",
   pin_ticket_invalid: "Votre validation a expiré. Recommencez l'opération.",
   no_referral_balance: "Aucun gain de parrainage à transférer.",
+  invalid_reset_token:
+    "Ce lien de réinitialisation est invalide ou a expiré. Demandez-en un nouveau.",
   provider_validation_failed:
     "Opération refusée par l'opérateur Mobile Money. Vérifiez le numéro et réessayez.",
 };

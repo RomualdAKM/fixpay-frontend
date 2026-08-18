@@ -23,7 +23,15 @@ const STRICT = process.env.NEXT_PUBLIC_MIDDLEWARE_GUARD === "strict";
 
 /** Routes reachable without a session. `/r` carries referral links (…/r/{code})
  *  that redirect a guest to /register — bouncing to /login first would break it. */
-const PUBLIC_PATHS = ["/onboarding", "/login", "/register", "/verify-email", "/r"];
+const PUBLIC_PATHS = [
+  "/onboarding",
+  "/login",
+  "/register",
+  "/forgot-password",
+  "/reset-password",
+  "/verify-email",
+  "/r",
+];
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some(
