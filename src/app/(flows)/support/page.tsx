@@ -34,8 +34,8 @@ const CONTACT_CHANNELS: {
   {
     id: "chat",
     icon: MessageCircle,
-    title: "Chat en direct",
-    subtitle: "Réponse en moins de 5 minutes",
+    title: "Aide rapide",
+    subtitle: "Assistant automatisé · un conseiller sur WhatsApp",
     href: "/support/chat",
   },
   {
@@ -103,7 +103,7 @@ const FAQ_ENTRIES: Record<string, { category: string; answer: string }> = {
 };
 
 /** Les deux gestes qu'on cherche quand on arrive ici en urgence. */
-const EMERGENCIES = [
+const EMERGENCIES: { title: string; subtitle: string; href: string }[] = [
   {
     title: "Bloquer une carte",
     subtitle: "Choisissez la carte à geler depuis vos cartes",
@@ -111,8 +111,8 @@ const EMERGENCIES = [
   },
   {
     title: "Signaler une opération",
-    subtitle: "Un conseiller reprend le dossier sous 24 h",
-    href: "/support/chat",
+    subtitle: "Écrivez-nous sur WhatsApp, tous les jours 8h – 22h",
+    href: "https://wa.me/221786304122",
   },
 ];
 
@@ -269,6 +269,7 @@ export default function SupportPage() {
                     title={item.title}
                     subtitle={item.subtitle}
                     href={item.href}
+                    external={item.href.startsWith("http")}
                   />
                 ))}
               </FlatList>
@@ -345,7 +346,8 @@ export default function SupportPage() {
                 Vous ne trouvez pas votre réponse ?
               </p>
               <p className="text-text-secondary mt-1 text-[12px] leading-[18px]">
-                Le chat répond en moins de 5 minutes. Une réclamation formelle
+                L&apos;assistant vous oriente vers le bon écran ; pour un
+                conseiller, WhatsApp répond de 8h à 22h. Une réclamation formelle
                 est traitée sous 5 jours ouvrés, avec un accusé de réception
                 immédiat.
               </p>
@@ -353,7 +355,7 @@ export default function SupportPage() {
                 href="/support/chat"
                 className="text-primary focus-visible:ring-primary/60 mt-2.5 inline-flex items-center gap-0.5 rounded-sm text-[12.5px] font-semibold focus-visible:ring-2 focus-visible:outline-none"
               >
-                Ouvrir le chat
+                Ouvrir l&apos;aide rapide
                 <ChevronRight
                   size={14}
                   strokeWidth={2}

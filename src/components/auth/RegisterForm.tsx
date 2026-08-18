@@ -1,8 +1,8 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -52,9 +52,25 @@ const schema = z
 type RegisterValues = z.infer<typeof schema>;
 
 export function RegisterForm() {
+  // `RegisterFormFields` lit `?ref=` via useSearchParams : cet appel doit vivre
+  // sous une frontière Suspense pour que /register reste prérendu statiquement
+  // (même convention que LoginForm sur la page de connexion).
+  return (
+    <Suspense fallback={null}>
+      <RegisterFormFields />
+    </Suspense>
+  );
+}
+
+function RegisterFormFields() {
   const { register: registerUser } = useAuth();
   const router = useRouter();
   const [formError, setFormError] = useState<unknown>(null);
+
+  // Code de parrainage transmis par un lien « …/r/{code} » (route src/app/r/[code]),
+  // qui redirige vers /register?ref={code}. Le champ reste librement éditable.
+  const searchParams = useSearchParams();
+  const referralFromLink = searchParams.get("ref")?.trim() ?? "";
 
   const {
     register,
@@ -68,7 +84,7 @@ export function RegisterForm() {
       email: "",
       password: "",
       password_confirmation: "",
-      referral_code: "",
+      referral_code: referralFromLink,
     },
   });
 

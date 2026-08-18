@@ -335,10 +335,16 @@ export default function SettingsPage() {
               />
             </dl>
             <div>
+              {/* Mène à l'écran /pin/set qui DÉFINIT réellement le code PIN
+                  (POST /api/pin) — sans lui, aucune liaison Mobile Money ni
+                  opération sensible n'est possible. La ligne pointait vers
+                  /support (Assistance), qui ne peut rien y faire. Le libellé
+                  suit l'état réel (GET /api/me) : « Définir » tant que le PIN
+                  n'existe pas, « Modifier » ensuite. */}
               <SettingsRow
-                title="Modifier mes codes"
-                value="Assistance"
-                href="/support"
+                title={user?.pin_set ? "Modifier mon code PIN" : "Définir mon code PIN"}
+                value={user?.pin_set ? "Défini" : "Non défini"}
+                href="/pin/set"
                 divider
               />
               <SettingsRow

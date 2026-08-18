@@ -15,7 +15,7 @@ describe("Support chat — no fabricated account operation", () => {
 
     // Accueil générique, honnête.
     expect(
-      screen.getByText(/je suis l'assistant FixPay/),
+      screen.getByText(/je suis l'assistant automatisé de FixPay/),
     ).toBeInTheDocument();
 
     // Aucune opération de compte fabriquée présentée comme réelle.
