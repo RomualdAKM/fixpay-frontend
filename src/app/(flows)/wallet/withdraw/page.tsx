@@ -51,7 +51,7 @@ function phoneDigits(raw: string): string {
 
 function toE164(dial: string | undefined, phone: string): string {
   const cc = (dial ?? "").replace(/\D/g, "");
-  const local = phoneDigits(phone).replace(/^0+/, "");
+  const local = phoneDigits(phone);
   return `+${cc}${local}`;
 }
 

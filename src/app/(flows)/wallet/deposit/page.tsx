@@ -48,7 +48,7 @@ function phoneDigits(raw: string): string {
 /** Compose un numéro E.164 à partir de l'indicatif du pays et de la saisie. */
 function toE164(dial: string | undefined, phone: string): string {
   const cc = (dial ?? "").replace(/\D/g, "");
-  const local = phoneDigits(phone).replace(/^0+/, "");
+  const local = phoneDigits(phone);
   return `+${cc}${local}`;
 }
 

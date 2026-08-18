@@ -23,7 +23,7 @@ function operatorLabel(code: string): string {
 
 function toE164(dial: string | undefined, phone: string): string {
   const cc = (dial ?? "").replace(/\D/g, "");
-  const local = phone.replace(/\D/g, "").replace(/^0+/, "");
+  const local = phone.replace(/\D/g, "");
   return `+${cc}${local}`;
 }
 
