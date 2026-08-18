@@ -27,6 +27,8 @@ const CODE_MESSAGES: Record<string, string> = {
   limit_exceeded:
     "Plafond atteint. Réessayez plus tard ou faites relever vos limites.",
   insufficient_balance: "Solde insuffisant pour cette opération.",
+  account_debit_blocked:
+    "Votre compte est temporairement bloqué au débit pour régularisation. Contactez le support pour le rétablir.",
   card_insufficient_balance: "Solde de la carte insuffisant.",
   card_not_rechargeable: "Cette carte ne peut pas être rechargée pour le moment.",
   card_initial_amount_unsupported: "Ce montant initial n'est pas pris en charge.",
