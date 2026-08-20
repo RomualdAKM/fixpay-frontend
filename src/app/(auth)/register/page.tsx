@@ -8,6 +8,7 @@ export const metadata = { title: "Créer un compte" };
 export default function RegisterPage() {
   return (
     <AuthShell
+      variant="landing"
       title="Créer un compte"
       subtitle="Un numéro Mobile Money et une adresse e-mail suffisent pour démarrer."
       footer={

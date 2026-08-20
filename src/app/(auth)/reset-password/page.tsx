@@ -9,6 +9,7 @@ export const metadata = { title: "Réinitialiser le mot de passe" };
 export default function ResetPasswordPage() {
   return (
     <AuthShell
+      variant="landing"
       title="Nouveau mot de passe"
       subtitle="Choisissez un nouveau mot de passe pour votre compte FixPay."
       footer={

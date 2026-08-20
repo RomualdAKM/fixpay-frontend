@@ -9,6 +9,7 @@ export const metadata = { title: "Connexion" };
 export default function LoginPage() {
   return (
     <AuthShell
+      variant="landing"
       title="Bon retour"
       subtitle="Connectez-vous pour accéder à votre portefeuille et vos cartes."
       footer={

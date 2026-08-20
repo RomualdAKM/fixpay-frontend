@@ -2,14 +2,13 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CheckCircle } from "lucide-react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { InlineError } from "@/components/feedback/InlineError";
-import { PasswordField } from "@/components/form/PasswordField";
-import { Button } from "@/components/ui/Button";
+import { AuthError } from "@/components/auth/AuthFeedback";
 import { useResetPassword } from "@/lib/api/hooks";
 import { applyApiErrors } from "@/lib/forms/applyApiErrors";
 
@@ -67,71 +66,82 @@ export function ResetPasswordForm() {
     }
   });
 
-  // Lien ouvert sans les paramètres attendus (copie partielle, lien tronqué) :
-  // on n'affiche pas le formulaire, on renvoie vers une nouvelle demande.
+  // Lien ouvert sans les paramètres attendus (copie partielle, lien tronqué).
   if (token === "" || email === "") {
     return (
-      <div className="flex flex-col gap-4">
-        <InlineError error="Ce lien de réinitialisation est incomplet ou invalide. Demandez-en un nouveau." />
-        <Button variant="primary" href="/forgot-password">
+      <div className="auth-form">
+        <AuthError error="Ce lien de réinitialisation est incomplet ou invalide. Demandez-en un nouveau." />
+        <Link href="/forgot-password" className="btn btn-primary btn-lg auth-submit">
           Demander un nouveau lien
-        </Button>
+        </Link>
       </div>
     );
   }
 
   if (done) {
     return (
-      <div className="flex flex-col gap-4">
-        <div
-          role="status"
-          className="border-success-border bg-success-surface flex items-start gap-2.5 rounded-md border px-3.5 py-3"
-        >
-          <CheckCircle
-            size={16}
-            strokeWidth={2}
-            absoluteStrokeWidth
-            aria-hidden="true"
-            className="text-success mt-[1px] shrink-0"
-          />
-          <p className="text-success text-[13px] leading-[18px]">
+      <div className="auth-form">
+        <div role="status" className="auth-ok">
+          <CheckCircle size={16} strokeWidth={2} absoluteStrokeWidth aria-hidden="true" />
+          <span>
             Votre mot de passe a été réinitialisé. Toutes vos sessions
             précédentes ont été déconnectées par sécurité.
-          </p>
+          </span>
         </div>
-        <Button variant="primary" href="/login">
+        <Link href="/login" className="btn btn-primary btn-lg auth-submit">
           Se connecter
-        </Button>
+        </Link>
       </div>
     );
   }
 
   return (
-    <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
-      <InlineError error={formError} />
-      <p className="text-text-secondary -mt-1 text-[13px] leading-[18px]">
-        Nouveau mot de passe pour <span className="text-text font-medium">{email}</span>.
+    <form onSubmit={onSubmit} noValidate className="auth-form">
+      <AuthError error={formError} />
+      <p className="field-hint" style={{ marginTop: "-6px" }}>
+        Nouveau mot de passe pour <strong>{email}</strong>.
       </p>
-      <PasswordField
-        label="Nouveau mot de passe"
-        autoComplete="new-password"
-        placeholder="12 caractères minimum"
-        hint="12 caractères, avec majuscule, minuscule, chiffre et symbole."
-        error={errors.password?.message}
-        {...register("password")}
-      />
-      <PasswordField
-        label="Confirmer le mot de passe"
-        autoComplete="new-password"
-        placeholder="Retapez le mot de passe"
-        error={errors.password_confirmation?.message}
-        {...register("password_confirmation")}
-      />
-      <div className="mt-2">
-        <Button variant="primary" type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Réinitialisation…" : "Réinitialiser mon mot de passe"}
-        </Button>
+      <div className="field">
+        <label htmlFor="reset-password">Nouveau mot de passe</label>
+        <input
+          id="reset-password"
+          type="password"
+          autoComplete="new-password"
+          placeholder="12 caractères minimum"
+          className={errors.password ? "invalid" : undefined}
+          {...register("password")}
+        />
+        {errors.password ? (
+          <span className="field-err">{errors.password.message}</span>
+        ) : (
+          <span className="field-hint">
+            12 caractères, avec majuscule, minuscule, chiffre et symbole.
+          </span>
+        )}
       </div>
+      <div className="field">
+        <label htmlFor="reset-password-confirm">Confirmer le mot de passe</label>
+        <input
+          id="reset-password-confirm"
+          type="password"
+          autoComplete="new-password"
+          placeholder="Retapez le mot de passe"
+          className={errors.password_confirmation ? "invalid" : undefined}
+          {...register("password_confirmation")}
+        />
+        {errors.password_confirmation && (
+          <span className="field-err">
+            {errors.password_confirmation.message}
+          </span>
+        )}
+      </div>
+      <button
+        type="submit"
+        className="btn btn-primary btn-lg auth-submit"
+        disabled={isSubmitting}
+      >
+        {isSubmitting ? "Réinitialisation…" : "Réinitialiser mon mot de passe"}
+      </button>
     </form>
   );
 }

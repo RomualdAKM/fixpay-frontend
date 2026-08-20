@@ -6,10 +6,7 @@ import { Suspense, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { PasswordField } from "@/components/form/PasswordField";
-import { TextField } from "@/components/form/TextField";
-import { Button } from "@/components/ui/Button";
-import { InlineError } from "@/components/feedback/InlineError";
+import { AuthError } from "@/components/auth/AuthFeedback";
 import { useAuth } from "@/lib/auth";
 import { applyApiErrors } from "@/lib/forms/applyApiErrors";
 
@@ -53,8 +50,7 @@ type RegisterValues = z.infer<typeof schema>;
 
 export function RegisterForm() {
   // `RegisterFormFields` lit `?ref=` via useSearchParams : cet appel doit vivre
-  // sous une frontière Suspense pour que /register reste prérendu statiquement
-  // (même convention que LoginForm sur la page de connexion).
+  // sous une frontière Suspense pour que /register reste prérendu statiquement.
   return (
     <Suspense fallback={null}>
       <RegisterFormFields />
@@ -105,50 +101,91 @@ function RegisterFormFields() {
   });
 
   return (
-    <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
-      <InlineError error={formError} />
-      <TextField
-        label="Nom complet"
-        autoComplete="name"
-        placeholder="Jean Dupont"
-        error={errors.name?.message}
-        {...register("name")}
-      />
-      <TextField
-        label="E-mail"
-        type="email"
-        autoComplete="email"
-        placeholder="vous@exemple.com"
-        error={errors.email?.message}
-        {...register("email")}
-      />
-      <PasswordField
-        label="Mot de passe"
-        autoComplete="new-password"
-        placeholder="12 caractères minimum"
-        hint="12 caractères, avec majuscule, minuscule, chiffre et symbole."
-        error={errors.password?.message}
-        {...register("password")}
-      />
-      <PasswordField
-        label="Confirmer le mot de passe"
-        autoComplete="new-password"
-        placeholder="Retapez le mot de passe"
-        error={errors.password_confirmation?.message}
-        {...register("password_confirmation")}
-      />
-      <TextField
-        label="Code de parrainage (optionnel)"
-        autoComplete="off"
-        placeholder="FP-XXXXXX"
-        error={errors.referral_code?.message}
-        {...register("referral_code")}
-      />
-      <div className="mt-2">
-        <Button variant="primary" type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Création…" : "Créer mon compte"}
-        </Button>
+    <form onSubmit={onSubmit} noValidate className="auth-form">
+      <AuthError error={formError} />
+
+      <div className="field">
+        <label htmlFor="reg-name">Nom complet</label>
+        <input
+          id="reg-name"
+          autoComplete="name"
+          placeholder="Jean Dupont"
+          className={errors.name ? "invalid" : undefined}
+          {...register("name")}
+        />
+        {errors.name && <span className="field-err">{errors.name.message}</span>}
       </div>
+
+      <div className="field">
+        <label htmlFor="reg-email">Adresse e-mail</label>
+        <input
+          id="reg-email"
+          type="email"
+          autoComplete="email"
+          placeholder="vous@exemple.com"
+          className={errors.email ? "invalid" : undefined}
+          {...register("email")}
+        />
+        {errors.email && <span className="field-err">{errors.email.message}</span>}
+      </div>
+
+      <div className="field">
+        <label htmlFor="reg-password">Mot de passe</label>
+        <input
+          id="reg-password"
+          type="password"
+          autoComplete="new-password"
+          placeholder="12 caractères minimum"
+          className={errors.password ? "invalid" : undefined}
+          {...register("password")}
+        />
+        {errors.password ? (
+          <span className="field-err">{errors.password.message}</span>
+        ) : (
+          <span className="field-hint">
+            12 caractères, avec majuscule, minuscule, chiffre et symbole.
+          </span>
+        )}
+      </div>
+
+      <div className="field">
+        <label htmlFor="reg-password-confirm">Confirmer le mot de passe</label>
+        <input
+          id="reg-password-confirm"
+          type="password"
+          autoComplete="new-password"
+          placeholder="Retapez le mot de passe"
+          className={errors.password_confirmation ? "invalid" : undefined}
+          {...register("password_confirmation")}
+        />
+        {errors.password_confirmation && (
+          <span className="field-err">
+            {errors.password_confirmation.message}
+          </span>
+        )}
+      </div>
+
+      <div className="field">
+        <label htmlFor="reg-referral">Code de parrainage (optionnel)</label>
+        <input
+          id="reg-referral"
+          autoComplete="off"
+          placeholder="FP-XXXXXX"
+          className={errors.referral_code ? "invalid" : undefined}
+          {...register("referral_code")}
+        />
+        {errors.referral_code && (
+          <span className="field-err">{errors.referral_code.message}</span>
+        )}
+      </div>
+
+      <button
+        type="submit"
+        className="btn btn-primary btn-lg auth-submit"
+        disabled={isSubmitting}
+      >
+        {isSubmitting ? "Création…" : "Créer mon compte"}
+      </button>
     </form>
   );
 }

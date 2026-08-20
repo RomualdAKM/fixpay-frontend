@@ -7,10 +7,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { PasswordField } from "@/components/form/PasswordField";
-import { TextField } from "@/components/form/TextField";
-import { Button } from "@/components/ui/Button";
-import { InlineError } from "@/components/feedback/InlineError";
+import { AuthError } from "@/components/auth/AuthFeedback";
 import { useAuth } from "@/lib/auth";
 import { applyApiErrors } from "@/lib/forms/applyApiErrors";
 
@@ -62,36 +59,49 @@ export function LoginForm() {
   });
 
   return (
-    <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
-      <InlineError error={formError} />
-      <TextField
-        label="E-mail"
-        type="email"
-        autoComplete="email"
-        placeholder="vous@exemple.com"
-        error={errors.email?.message}
-        {...register("email")}
-      />
-      <PasswordField
-        label="Mot de passe"
-        autoComplete="current-password"
-        placeholder="••••••••••••"
-        error={errors.password?.message}
-        {...register("password")}
-      />
-      <div className="-mt-1 flex justify-end">
-        <Link
-          href="/forgot-password"
-          className="text-primary-light text-[13px] font-medium underline-offset-4 hover:underline"
-        >
-          Mot de passe oublié ?
-        </Link>
+    <form onSubmit={onSubmit} noValidate className="auth-form">
+      <AuthError error={formError} />
+
+      <div className="field">
+        <label htmlFor="login-email">Adresse e-mail</label>
+        <input
+          id="login-email"
+          type="email"
+          autoComplete="email"
+          placeholder="vous@exemple.com"
+          className={errors.email ? "invalid" : undefined}
+          {...register("email")}
+        />
+        {errors.email && <span className="field-err">{errors.email.message}</span>}
       </div>
-      <div className="mt-2">
-        <Button variant="primary" type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Connexion…" : "Se connecter"}
-        </Button>
+
+      <div className="field">
+        <div className="field-head">
+          <label htmlFor="login-password">Mot de passe</label>
+          <Link href="/forgot-password" className="field-link">
+            Mot de passe oublié ?
+          </Link>
+        </div>
+        <input
+          id="login-password"
+          type="password"
+          autoComplete="current-password"
+          placeholder="••••••••••••"
+          className={errors.password ? "invalid" : undefined}
+          {...register("password")}
+        />
+        {errors.password && (
+          <span className="field-err">{errors.password.message}</span>
+        )}
       </div>
+
+      <button
+        type="submit"
+        className="btn btn-primary btn-lg auth-submit"
+        disabled={isSubmitting}
+      >
+        {isSubmitting ? "Connexion…" : "Se connecter"}
+      </button>
     </form>
   );
 }

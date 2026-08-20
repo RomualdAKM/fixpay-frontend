@@ -8,6 +8,7 @@ export const metadata = { title: "Mot de passe oublié" };
 export default function ForgotPasswordPage() {
   return (
     <AuthShell
+      variant="landing"
       title="Mot de passe oublié"
       subtitle="Indiquez l’adresse e-mail de votre compte : nous vous enverrons un lien pour définir un nouveau mot de passe."
       footer={
