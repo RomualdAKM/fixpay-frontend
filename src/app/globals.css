@@ -169,7 +169,7 @@
    cartes blanches sur un fond bleuté, les accents sont assombris pour tenir AA.
    --------------------------------------------------------------------------- */
 [data-theme="light"] {
-  --c-bg: #eef1f8;
+  --c-bg: #ffffff;
   --c-bg-raised: #ffffff;
   --c-nav: rgb(255 255 255 / 0.94);
 
