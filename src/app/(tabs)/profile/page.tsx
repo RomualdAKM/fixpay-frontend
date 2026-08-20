@@ -11,11 +11,12 @@ import {
   LifeBuoy,
   Lock,
   Plus,
+  Settings,
   Star,
-  User as UserIcon,
   type LucideIcon,
 } from "lucide-react";
 
+import { LogoutButton } from "@/components/auth/LogoutButton";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { InlineError } from "@/components/feedback/InlineError";
@@ -327,8 +328,8 @@ export default function ProfilePage() {
             </div>
             <MenuList className="mt-2">
               <MenuRow
-                icon={UserIcon}
-                title="Informations personnelles"
+                icon={Settings}
+                title="Paramètres"
                 href="/profile/settings"
               />
               <MenuRow
@@ -346,12 +347,7 @@ export default function ProfilePage() {
           </div>
 
           <div className="border-border mt-10 border-t pt-5 lg:col-span-2 lg:mt-12 lg:flex lg:items-center lg:justify-between lg:gap-6">
-            <Link
-              href="/profile/settings"
-              className="border-border text-text-secondary hover:border-border-strong focus-visible:ring-primary/60 inline-flex h-10 items-center rounded-md border px-4 text-[13.5px] font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
-            >
-              Paramètres et déconnexion
-            </Link>
+            <LogoutButton className="lg:h-10 lg:w-auto lg:px-5 lg:text-[13.5px]" />
             <p className="text-text-muted mt-3 text-[11px] leading-[15px] lg:mt-0">
               CGU · Confidentialité · v{APP_VERSION}
             </p>

@@ -15,9 +15,9 @@ import {
 } from "lucide-react";
 
 import { FixPayLogo } from "@/components/brand/FixPayLogo";
+import { UserMenu } from "@/components/layout/UserMenu";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { SectionLabel } from "@/components/ui/SectionLabel";
-import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 interface NavEntry {
@@ -80,10 +80,6 @@ function isActive(pathname: string, entry: NavEntry, all: NavEntry[]): boolean {
   return all.every((e) => e === entry || score(e) <= own);
 }
 
-function initialOf(name: string): string {
-  return name.trim().charAt(0).toUpperCase() || "?";
-}
-
 function NavList({ entries, all }: { entries: NavEntry[]; all: NavEntry[] }) {
   const pathname = usePathname();
   return (
@@ -126,7 +122,6 @@ function NavList({ entries, all }: { entries: NavEntry[]; all: NavEntry[] }) {
  */
 export function Sidebar() {
   const all = [...PRIMARY, ...SECONDARY];
-  const { user, status } = useAuth();
 
   return (
     <aside
@@ -165,35 +160,7 @@ export function Sidebar() {
         Créer une carte
       </Link>
 
-      {status === "loading" ? (
-        <div
-          aria-hidden="true"
-          className="border-border bg-surface mt-3 flex items-center gap-3 rounded-md border p-3"
-        >
-          <span className="bg-surface-5 size-9 shrink-0 animate-pulse rounded-full" />
-          <span className="min-w-0 flex-1 space-y-1.5">
-            <span className="bg-surface-5 block h-3 w-24 animate-pulse rounded" />
-            <span className="bg-surface-5 block h-2.5 w-32 animate-pulse rounded" />
-          </span>
-        </div>
-      ) : user ? (
-        <Link
-          href="/profile"
-          className="border-border bg-surface hover:bg-surface-2 mt-3 flex items-center gap-3 rounded-md border p-3 transition-colors"
-        >
-          <span className="bg-surface-5 text-text flex size-9 shrink-0 items-center justify-center rounded-full text-[13px] font-bold">
-            {initialOf(user.name)}
-          </span>
-          <span className="min-w-0">
-            <span className="text-text block truncate text-[13px] font-medium">
-              {user.name}
-            </span>
-            <span className="text-text-muted block truncate text-[11px]">
-              {user.email}
-            </span>
-          </span>
-        </Link>
-      ) : null}
+      <UserMenu />
     </aside>
   );
 }
